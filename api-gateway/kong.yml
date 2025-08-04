@@ -1,0 +1,146 @@
+_format_version: "3.0"
+
+services:
+  - name: auth-service
+    url: http://host.docker.internal:8080
+    routes:
+      - name: auth-routes
+        paths:
+          - /api/auth
+        strip_path: true
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          headers: ["Content-Type", "Authorization"]
+          exposed_headers: ["X-Total-Count"]
+          credentials: true
+          max_age: 3600
+      - name: rate-limiting
+        config:
+          minute: 100
+          hour: 1000
+          policy: local
+      - name: jwt
+        config:
+          secret: "your-jwt-secret-key"
+          key_claim_name: "iss"
+          algorithm: "HS256"
+
+  - name: user-service
+    url: http://host.docker.internal:8081
+    routes:
+      - name: user-routes
+        paths:
+          - /api/users
+        strip_path: true
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          headers: ["Content-Type", "Authorization"]
+          exposed_headers: ["X-Total-Count"]
+          credentials: true
+          max_age: 3600
+      - name: rate-limiting
+        config:
+          minute: 200
+          hour: 2000
+          policy: local
+      - name: jwt
+        config:
+          secret: "your-jwt-secret-key"
+          key_claim_name: "iss"
+          algorithm: "HS256"
+
+  - name: billing-service
+    url: http://host.docker.internal:8082
+    routes:
+      - name: billing-routes
+        paths:
+          - /api/billing
+        strip_path: true
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          headers: ["Content-Type", "Authorization"]
+          exposed_headers: ["X-Total-Count"]
+          credentials: true
+          max_age: 3600
+      - name: rate-limiting
+        config:
+          minute: 50
+          hour: 500
+          policy: local
+      - name: jwt
+        config:
+          secret: "your-jwt-secret-key"
+          key_claim_name: "iss"
+          algorithm: "HS256"
+
+  - name: notification-service
+    url: http://host.docker.internal:8083
+    routes:
+      - name: notification-routes
+        paths:
+          - /api/notifications
+        strip_path: true
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          headers: ["Content-Type", "Authorization"]
+          exposed_headers: ["X-Total-Count"]
+          credentials: true
+          max_age: 3600
+      - name: rate-limiting
+        config:
+          minute: 100
+          hour: 1000
+          policy: local
+      - name: jwt
+        config:
+          secret: "your-jwt-secret-key"
+          key_claim_name: "iss"
+          algorithm: "HS256"
+
+  - name: analytics-service
+    url: http://host.docker.internal:8084
+    routes:
+      - name: analytics-routes
+        paths:
+          - /api/analytics
+        strip_path: true
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          headers: ["Content-Type", "Authorization"]
+          exposed_headers: ["X-Total-Count"]
+          credentials: true
+          max_age: 3600
+      - name: rate-limiting
+        config:
+          minute: 300
+          hour: 3000
+          policy: local
+      - name: jwt
+        config:
+          secret: "your-jwt-secret-key"
+          key_claim_name: "iss"
+          algorithm: "HS256"
+
+consumers:
+  - username: saas-admin
+    custom_id: admin-user
+    tags: ["admin"]
+
+keyauth_credentials:
+  - consumer: saas-admin
+    key: admin-api-key 

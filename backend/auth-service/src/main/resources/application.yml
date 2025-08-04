@@ -1,0 +1,121 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: auth-service
+  
+  datasource:
+    url: jdbc:postgresql://localhost:5432/saas_starter_kit
+    username: saas_user
+    password: saas_password
+    driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    packages-to-scan: com.saasstarterkit.auth.entity
+  
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+  
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:bvinod@gmail.com}
+    password: ${MAIL_PASSWORD:Mynameisbila1#}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+  
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:58807173988-t5rouh0tmsd32lbq562lr7gsbba1f0fr.apps.googleusercontent.com}
+            client-secret: ${GOOGLE_CLIENT_SECRET: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}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope:
+              - email
+              - profile
+
+          microsoft:
+            provider: microsoft
+            client-id: ${MICROSOFT_CLIENT_ID:dc94bbfc-9daf-4f85-a004-3ed0c523c6d4}
+            client-secret: ${MICROSOFT_CLIENT_SECRET:f0718ee6-34e4-46ef-8c13-d576266a59c9}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope:
+              - openid
+              - email
+              - profile
+        provider:
+          microsoft:
+            authorization-uri: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
+            token-uri: https://login.microsoftonline.com/common/oauth2/v2.0/token
+            user-info-uri: https://graph.microsoft.com/oidc/userinfo
+            jwk-set-uri: https://login.microsoftonline.com/common/discovery/v2.0/keys
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:DUO9HD24VrhZWLnypYn/gKpcihfBBkKl7wfaNKUPPOs=}
+  expiration: 86400000 # 24 hours in milliseconds
+  refresh-expiration: 604800000 # 7 days in milliseconds
+
+# Application Configuration
+app:
+  auth:
+    password-reset:
+      expiration: 3600000 # 1 hour in milliseconds
+    email-verification:
+      expiration: 86400000 # 24 hours in milliseconds
+    mfa:
+      enabled: true
+      issuer: "SaaS Starter Kit"
+  
+  cors:
+    allowed-origins: 
+      - "http://localhost:3000"
+      - "http://localhost:3001"
+    allowed-methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - OPTIONS
+    allowed-headers:
+      - "*"
+    allow-credentials: true
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+# Logging
+logging:
+  level:
+    com.saasstarterkit.auth: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n" 

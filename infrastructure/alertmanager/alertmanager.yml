@@ -1,0 +1,46 @@
+global:
+  resolve_timeout: 5m
+  slack_api_url: 'https://hooks.slack.com/services/YOUR_SLACK_WEBHOOK_URL'
+
+route:
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'web.hook'
+  routes:
+  - match:
+      severity: critical
+    receiver: 'slack-notifications'
+    continue: true
+  - match:
+      severity: warning
+    receiver: 'email-notifications'
+
+receivers:
+- name: 'web.hook'
+  webhook_configs:
+  - url: 'http://127.0.0.1:5001/'
+
+- name: 'slack-notifications'
+  slack_configs:
+  - channel: '#alerts'
+    title: '{{ template "slack.title" . }}'
+    text: '{{ template "slack.text" . }}'
+    send_resolved: true
+
+- name: 'email-notifications'
+  email_configs:
+  - to: 'admin@yourcompany.com'
+    from: 'alertmanager@yourcompany.com'
+    smarthost: 'smtp.gmail.com:587'
+    auth_username: 'your-email@gmail.com'
+    auth_password: 'your-app-password'
+    send_resolved: true
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'dev', 'instance'] 
