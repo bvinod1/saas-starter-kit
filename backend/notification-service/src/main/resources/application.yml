@@ -1,5 +1,5 @@
 server:
-  port: 8083
+  port: 8084
 
 spring:
   application:
@@ -19,48 +19,110 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
-    packages-to-scan: com.saasstarterkit.notification.entity
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
   
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      timeout: 2000ms
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: saas_user
+    password: saas_password
+    virtual-host: saas_vhost
+    listener:
+      simple:
+        concurrency: 5
+        max-concurrency: 10
+        prefetch: 1
+        default-requeue-rejected: false
+    publisher-confirm-type: correlated
+    publisher-returns: true
   
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${MAIL_USERNAME:bvinod@gmail.com}
-    password: ${MAIL_PASSWORD:Mynameisbila1#}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
+  
+  cache:
+    type: redis
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
 
-# JWT Configuration
-jwt:
-  secret: ${JWT_SECRET:DUO9HD24VrhZWLnypYn/gKpcihfBBkKl7wfaNKUPPOs=}
-  expiration: 86400000 # 24 hours in milliseconds
+# External Service Configurations
+notification:
+  providers:
+    email:
+      sendgrid:
+        api-key: ${SENDGRID_API_KEY:}
+        from-email: ${SENDGRID_FROM_EMAIL:noreply@saasstarterkit.com}
+        from-name: ${SENDGRID_FROM_NAME:SaaS Starter Kit}
+      smtp:
+        enabled: true
+        from-email: ${SMTP_FROM_EMAIL:noreply@saasstarterkit.com}
+        from-name: ${SMTP_FROM_NAME:SaaS Starter Kit}
+    
+    sms:
+      twilio:
+        enabled: ${TWILIO_ENABLED:false}
+        account-sid: ${TWILIO_ACCOUNT_SID:}
+        auth-token: ${TWILIO_AUTH_TOKEN:}
+        from-number: ${TWILIO_FROM_NUMBER:}
+      max-length: 160
+      rate-limit-per-minute: 10
+    
+    push:
+      firebase:
+        enabled: ${FIREBASE_ENABLED:false}
+        project-id: ${FIREBASE_PROJECT_ID:}
+        private-key-id: ${FIREBASE_PRIVATE_KEY_ID:}
+        private-key: ${FIREBASE_PRIVATE_KEY:}
+        client-email: ${FIREBASE_CLIENT_EMAIL:}
+        client-id: ${FIREBASE_CLIENT_ID:}
+      max-title-length: 50
+      max-body-length: 200
+      rate-limit-per-minute: 100
+    
+    in-app:
+      enabled: true
+      max-title-length: 100
+      max-body-length: 500
+      rate-limit-per-minute: 200
+      websocket:
+        destination-prefix: /user
+    
+    webhook:
+      enabled: ${WEBHOOK_ENABLED:false}
+      timeout-seconds: 30
+      max-retries: 3
+      rate-limit-per-minute: 60
+      default-headers: '{"X-Custom-Header": "SaaS-Starter-Kit"}'
+  
+  templates:
+    cache-ttl: 3600 # 1 hour
+    default-language: en
+  
+  retry:
+    max-attempts: 3
+    initial-interval: 1000ms
+    multiplier: 2.0
+    max-interval: 10000ms
+  
+  dead-letter:
+    queue: notification.dlq
+    exchange: notification.dlx
+    routing-key: notification.dlq
 
-# Application Configuration
-app:
-  cors:
-    allowed-origins: 
-      - "http://localhost:3000"
-      - "http://localhost:3001"
-    allowed-methods:
-      - GET
-      - POST
-      - PUT
-      - DELETE
-      - OPTIONS
-    allowed-headers:
-      - "*"
-    allow-credentials: true
-
-# Management endpoints
+# Monitoring and Metrics
 management:
   endpoints:
     web:
@@ -69,13 +131,21 @@ management:
   endpoint:
     health:
       show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
 
 # Logging
 logging:
   level:
     com.saasstarterkit.notification: DEBUG
-    org.springframework.security: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.amqp: INFO
+    org.springframework.mail: INFO
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n" 
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+# Tenant Configuration
+tenant:
+  default-schema: shared
+  schema-prefix: tenant_ 
