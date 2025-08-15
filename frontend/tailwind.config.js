@@ -84,10 +84,25 @@ module.exports = {
           900: '#111827',
           950: '#030712',
         },
+        // Custom SaaS Starter Kit Colors
+        saas: {
+          primary: '#1B414A',
+          secondary: '#D8362B',
+          accent: '#682133',
+          'primary-light': '#2a5a63',
+          'secondary-light': '#e54d42',
+          'accent-light': '#7a2a3d',
+        },
+        // Specific color palette as requested
+        'dark-red': '#682133',
+        'red': '#D8362B',
+        'green': '#1B414A',
+        'dark-green': '#0f2a30',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Gilroy', 'General Sans', 'Inter', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
+        gilroy: ['Gilroy', 'General Sans', 'Inter', 'system-ui', 'sans-serif'],
       },
       fontSize: {
         'xs': ['0.75rem', { lineHeight: '1rem' }],

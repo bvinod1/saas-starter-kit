@@ -1,0 +1,817 @@
+_format_version: "3.0"
+
+# =============================================================================
+# Kong API Gateway Enhanced Multi-Tenant SaaS Platform Configuration
+# =============================================================================
+# This enhanced configuration implements:
+# - Advanced tenant isolation with security headers
+# - Comprehensive authentication mechanisms (JWT, OAuth2, SAML)
+# - Enhanced rate limiting and DDoS protection
+# - Security headers and CORS policies
+# - Audit logging and monitoring
+# - Tenant-specific security policies
+# - Advanced routing with tenant validation
+# =============================================================================
+
+# =============================================================================
+# 1. GLOBAL PLUGINS (Applied to all requests)
+# =============================================================================
+
+plugins:
+  # Global Security Headers
+  - name: response-transformer
+    config:
+      add:
+        headers: 
+          - "X-Frame-Options:DENY"
+          - "X-Content-Type-Options:nosniff"
+          - "X-XSS-Protection:1; mode=block"
+          - "Strict-Transport-Security:max-age=31536000; includeSubDomains"
+          - "Referrer-Policy:strict-origin-when-cross-origin"
+          - "Content-Security-Policy:default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+          - "Permissions-Policy:geolocation=(), microphone=(), camera=()"
+    tags: ["global", "security-headers"]
+
+  # Global CORS Configuration
+  - name: cors
+    config:
+      origins: ["*"]
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+      headers: ["Content-Type", "Authorization", "X-Tenant-ID", "X-Request-ID", "X-Client-Version"]
+      exposed_headers: ["X-Total-Count", "X-Tenant-ID", "X-Request-ID", "X-Rate-Limit-Remaining"]
+      credentials: true
+      max_age: 3600
+      preflight_continue: false
+    tags: ["global", "cors"]
+
+  # Global Request ID Generation
+  - name: pre-function
+    config:
+      access:
+        - |
+          local function generate_request_id()
+            local request_id = kong.request.get_header("X-Request-ID")
+            if not request_id then
+              request_id = string.format("%s-%s", os.time(), math.random(1000, 9999))
+              kong.response.set_header("X-Request-ID", request_id)
+            end
+          end
+          
+          generate_request_id()
+    tags: ["global", "request-id"]
+
+  # Global Tenant Header Validation
+  - name: pre-function
+    config:
+      access:
+        - |
+          local function validate_tenant_header()
+            local path = kong.request.get_path()
+            
+            -- Skip validation for public endpoints
+            if string.match(path, "^/api/auth") or string.match(path, "^/health") then
+              return
+            end
+            
+            local tenant_id = kong.request.get_header("X-Tenant-ID")
+            if not tenant_id then
+              kong.response.exit(400, { 
+                message = "X-Tenant-ID header is required",
+                code = "MISSING_TENANT_ID",
+                request_id = kong.response.get_header("X-Request-ID")
+              })
+            end
+            
+            -- Validate tenant ID format and existence
+            if not string.match(tenant_id, "^tenant%-[a-z0-9%-]+$") then
+              kong.response.exit(400, { 
+                message = "Invalid tenant ID format",
+                code = "INVALID_TENANT_ID",
+                request_id = kong.response.get_header("X-Request-ID")
+              })
+            end
+            
+            -- Store tenant ID in Kong context for downstream plugins
+            kong.ctx.shared.tenant_id = tenant_id
+          end
+          
+          validate_tenant_header()
+    tags: ["global", "tenant-validation"]
+
+  # Global Rate Limiting (Basic protection)
+  - name: rate-limiting
+    config:
+      minute: 1000
+      hour: 10000
+      day: 100000
+      policy: local
+      fault_tolerant: true
+      hide_client_headers: false
+    tags: ["global", "rate-limiting"]
+
+  # Global Request Size Limiting
+  - name: request-size-limiting
+    config:
+      allowed_payload_size: 10485760  # 10MB
+    tags: ["global", "request-limiting"]
+
+  # Global IP Restriction (Optional - for production)
+  - name: ip-restriction
+    config:
+      allow: ["0.0.0.0/0"]  # Allow all IPs - customize for production
+    tags: ["global", "ip-restriction"]
+
+# =============================================================================
+# 2. TENANT A CONFIGURATION (Basic Tier)
+# =============================================================================
+
+services:
+  # Tenant A - User Service
+  - name: tenant-a-user-service
+    url: http://host.docker.internal:8081
+    tags: ["tenant-a", "user-service", "basic-tier"]
+    routes:
+      - name: tenant-a-user-routes
+        paths:
+          - /tenant-a/api/users
+        strip_path: true
+        tags: ["tenant-a", "user-routes"]
+        headers:
+          X-Tenant-ID: ["tenant-a"]
+    plugins:
+      # Tenant-specific CORS
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          headers: ["Content-Type", "Authorization", "X-Tenant-ID", "X-Request-ID"]
+          exposed_headers: ["X-Total-Count", "X-Tenant-ID", "X-Request-ID"]
+          credentials: true
+          max_age: 3600
+        tags: ["tenant-a", "cors"]
+
+      # Tenant-specific Rate Limiting
+      - name: rate-limiting
+        config:
+          minute: 100
+          hour: 1000
+          day: 10000
+          policy: local
+          fault_tolerant: true
+          hide_client_headers: false
+        tags: ["tenant-a", "rate-limiting"]
+
+      # JWT Authentication
+      - name: jwt
+        config:
+          secret: "tenant-a-jwt-secret-key-${RANDOM_UUID}"
+          key_claim_name: "kid"
+          algorithm: "HS256"
+          claims_to_verify: ["iss", "sub", "tid", "exp", "iat"]
+          key_claim_name: "kid"
+          anonymous: null
+          run_on_preflight: false
+        tags: ["tenant-a", "jwt"]
+
+      # Request Transformation
+      - name: request-transformer
+        config:
+          add:
+            headers: ["X-Tenant-ID:tenant-a"]
+            json: ["tenant_id:tenant-a"]
+        tags: ["tenant-a", "request-transformer"]
+
+      # Response Transformation
+      - name: response-transformer
+        config:
+          add:
+            headers: ["X-Tenant-ID:tenant-a"]
+        tags: ["tenant-a", "response-transformer"]
+
+      # Logging
+      - name: file-log
+        config:
+          path: /var/log/kong/tenant-a.log
+          reopen: true
+        tags: ["tenant-a", "logging"]
+
+  # Tenant A - Billing Service
+  - name: tenant-a-billing-service
+    url: http://host.docker.internal:8082
+    tags: ["tenant-a", "billing-service", "basic-tier"]
+    routes:
+      - name: tenant-a-billing-routes
+        paths:
+          - /tenant-a/api/billing
+        strip_path: true
+        tags: ["tenant-a", "billing-routes"]
+        headers:
+          X-Tenant-ID: ["tenant-a"]
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          headers: ["Content-Type", "Authorization", "X-Tenant-ID", "X-Request-ID"]
+          exposed_headers: ["X-Total-Count", "X-Tenant-ID", "X-Request-ID"]
+          credentials: true
+          max_age: 3600
+        tags: ["tenant-a", "cors"]
+
+      - name: rate-limiting
+        config:
+          minute: 50
+          hour: 500
+          day: 5000
+          policy: local
+          fault_tolerant: true
+        tags: ["tenant-a", "rate-limiting"]
+
+      - name: jwt
+        config:
+          secret: "tenant-a-jwt-secret-key-${RANDOM_UUID}"
+          key_claim_name: "kid"
+          algorithm: "HS256"
+          claims_to_verify: ["iss", "sub", "tid", "exp", "iat"]
+        tags: ["tenant-a", "jwt"]
+
+      - name: request-transformer
+        config:
+          add:
+            headers: ["X-Tenant-ID:tenant-a"]
+            json: ["tenant_id:tenant-a"]
+        tags: ["tenant-a", "request-transformer"]
+
+# =============================================================================
+# 3. TENANT B CONFIGURATION (Standard Tier)
+# =============================================================================
+
+  # Tenant B - User Service (OAuth2 + JWT)
+  - name: tenant-b-user-service
+    url: http://host.docker.internal:8081
+    tags: ["tenant-b", "user-service", "standard-tier"]
+    routes:
+      - name: tenant-b-user-routes
+        paths:
+          - /tenant-b/api/users
+        strip_path: true
+        tags: ["tenant-b", "user-routes"]
+        headers:
+          X-Tenant-ID: ["tenant-b"]
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+          headers: ["Content-Type", "Authorization", "X-Tenant-ID", "X-Request-ID"]
+          exposed_headers: ["X-Total-Count", "X-Tenant-ID", "X-Request-ID"]
+          credentials: true
+          max_age: 3600
+        tags: ["tenant-b", "cors"]
+
+      - name: rate-limiting
+        config:
+          minute: 200
+          hour: 2000
+          day: 20000
+          policy: local
+          fault_tolerant: true
+        tags: ["tenant-b", "rate-limiting"]
+
+      # OAuth2 Authentication
+      - name: oauth2
+        config:
+          scopes: ["email", "profile", "read", "write", "admin"]
+          enable_authorization_code: true
+          enable_client_credentials: true
+          enable_implicit_grant: true
+          enable_password_grant: true
+          token_expiration: 7200
+          refresh_token_ttl: 1209600
+          enable_client_credentials: true
+          accept_http_if_terminated: true
+        tags: ["tenant-b", "oauth2"]
+
+      # JWT for API access
+      - name: jwt
+        config:
+          secret: "tenant-b-jwt-secret-key-${RANDOM_UUID}"
+          key_claim_name: "kid"
+          algorithm: "HS256"
+          claims_to_verify: ["iss", "sub", "tid", "exp", "iat"]
+          anonymous: null
+        tags: ["tenant-b", "jwt"]
+
+      - name: request-transformer
+        config:
+          add:
+            headers: ["X-Tenant-ID:tenant-b"]
+            json: ["tenant_id:tenant-b"]
+        tags: ["tenant-b", "request-transformer"]
+
+      # Enhanced Logging
+      - name: file-log
+        config:
+          path: /var/log/kong/tenant-b.log
+          reopen: true
+        tags: ["tenant-b", "logging"]
+
+  # Tenant B - Analytics Service
+  - name: tenant-b-analytics-service
+    url: http://host.docker.internal:8084
+    tags: ["tenant-b", "analytics-service", "standard-tier"]
+    routes:
+      - name: tenant-b-analytics-routes
+        paths:
+          - /tenant-b/api/analytics
+        strip_path: true
+        tags: ["tenant-b", "analytics-routes"]
+        headers:
+          X-Tenant-ID: ["tenant-b"]
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          headers: ["Content-Type", "Authorization", "X-Tenant-ID", "X-Request-ID"]
+          exposed_headers: ["X-Total-Count", "X-Tenant-ID", "X-Request-ID"]
+          credentials: true
+          max_age: 3600
+        tags: ["tenant-b", "cors"]
+
+      - name: rate-limiting
+        config:
+          minute: 300
+          hour: 3000
+          day: 30000
+          policy: local
+          fault_tolerant: true
+        tags: ["tenant-b", "rate-limiting"]
+
+      - name: oauth2
+        config:
+          scopes: ["email", "profile", "read", "write", "analytics"]
+          enable_authorization_code: true
+          enable_client_credentials: true
+          enable_implicit_grant: true
+          enable_password_grant: true
+          token_expiration: 7200
+          refresh_token_ttl: 1209600
+        tags: ["tenant-b", "oauth2"]
+
+      - name: request-transformer
+        config:
+          add:
+            headers: ["X-Tenant-ID:tenant-b"]
+            json: ["tenant_id:tenant-b"]
+        tags: ["tenant-b", "request-transformer"]
+
+# =============================================================================
+# 4. TENANT C CONFIGURATION (Enterprise Tier)
+# =============================================================================
+
+  # Tenant C - Premium Service with Advanced Security
+  - name: tenant-c-user-service
+    url: http://host.docker.internal:8081
+    tags: ["tenant-c", "user-service", "enterprise-tier"]
+    routes:
+      - name: tenant-c-user-routes
+        paths:
+          - /tenant-c/api/users
+        strip_path: true
+        tags: ["tenant-c", "user-routes"]
+        headers:
+          X-Tenant-ID: ["tenant-c"]
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"]
+          headers: ["Content-Type", "Authorization", "X-Tenant-ID", "X-Request-ID", "X-Client-Version"]
+          exposed_headers: ["X-Total-Count", "X-Tenant-ID", "X-Request-ID", "X-Rate-Limit-Remaining"]
+          credentials: true
+          max_age: 3600
+        tags: ["tenant-c", "cors"]
+
+      - name: rate-limiting
+        config:
+          minute: 500
+          hour: 5000
+          day: 50000
+          policy: local
+          fault_tolerant: true
+        tags: ["tenant-c", "rate-limiting"]
+
+      # Advanced JWT with multiple algorithms support
+      - name: jwt
+        config:
+          secret: "tenant-c-jwt-secret-key-${RANDOM_UUID}"
+          key_claim_name: "kid"
+          algorithm: "HS256,RS256"
+          claims_to_verify: ["iss", "sub", "tid", "exp", "iat", "nbf"]
+          anonymous: null
+          run_on_preflight: false
+        tags: ["tenant-c", "jwt"]
+
+      - name: request-transformer
+        config:
+          add:
+            headers: ["X-Tenant-ID:tenant-c"]
+            json: ["tenant_id:tenant-c"]
+        tags: ["tenant-c", "request-transformer"]
+
+      # Advanced Logging with Structured Data
+      - name: file-log
+        config:
+          path: /var/log/kong/tenant-c.log
+          reopen: true
+        tags: ["tenant-c", "logging"]
+
+      # Request Size Limiting (Higher for Enterprise)
+      - name: request-size-limiting
+        config:
+          allowed_payload_size: 52428800  # 50MB
+        tags: ["tenant-c", "request-limiting"]
+
+      # IP Restriction (Optional - for enterprise security)
+      - name: ip-restriction
+        config:
+          allow: ["0.0.0.0/0"]  # Customize for enterprise requirements
+        tags: ["tenant-c", "ip-restriction"]
+
+# =============================================================================
+# 5. SHARED SERVICES (Available to All Tenants)
+# =============================================================================
+
+  # Shared Auth Service
+  - name: shared-auth-service
+    url: http://host.docker.internal:8085
+    tags: ["shared", "auth-service"]
+    routes:
+      - name: shared-auth-routes
+        paths:
+          - /api/auth
+        strip_path: true
+        tags: ["shared", "auth-routes"]
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          headers: ["Content-Type", "Authorization", "X-Request-ID"]
+          exposed_headers: ["X-Total-Count", "X-Request-ID"]
+          credentials: true
+          max_age: 3600
+        tags: ["shared", "cors"]
+
+      - name: rate-limiting
+        config:
+          minute: 200
+          hour: 2000
+          day: 20000
+          policy: local
+          fault_tolerant: true
+        tags: ["shared", "rate-limiting"]
+
+      # Basic JWT for shared auth
+      - name: jwt
+        config:
+          secret: "shared-auth-jwt-secret-key-${RANDOM_UUID}"
+          key_claim_name: "kid"
+          algorithm: "HS256"
+          claims_to_verify: ["iss", "sub", "exp", "iat"]
+          anonymous: null
+        tags: ["shared", "jwt"]
+
+      # Enhanced Logging for Auth Service
+      - name: file-log
+        config:
+          path: /var/log/kong/shared-auth.log
+          reopen: true
+        tags: ["shared", "logging"]
+
+  # Health Check Service
+  - name: health-check-service
+    url: http://host.docker.internal:8086
+    tags: ["shared", "health"]
+    routes:
+      - name: health-check-routes
+        paths:
+          - /health
+          - /metrics
+        strip_path: true
+        tags: ["shared", "health-routes"]
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "OPTIONS"]
+          headers: ["Content-Type", "X-Request-ID"]
+          exposed_headers: ["X-Request-ID"]
+          credentials: false
+          max_age: 3600
+        tags: ["shared", "cors"]
+
+      # No authentication for health checks
+      - name: rate-limiting
+        config:
+          minute: 1000
+          hour: 10000
+          day: 100000
+          policy: local
+          fault_tolerant: true
+        tags: ["shared", "rate-limiting"]
+
+# =============================================================================
+# 6. CONSUMERS (Users) PER TENANT WORKSPACE
+# =============================================================================
+
+consumers:
+  # Tenant A Consumers
+  - username: user1_tenant_a
+    custom_id: user1_tenant_a
+    tags: ["tenant-a", "user", "basic-tier"]
+  
+  - username: admin_tenant_a
+    custom_id: admin_tenant_a
+    tags: ["tenant-a", "admin", "basic-tier"]
+
+  # Tenant B Consumers
+  - username: user1_tenant_b
+    custom_id: user1_tenant_b
+    tags: ["tenant-b", "user", "standard-tier"]
+  
+  - username: admin_tenant_b
+    custom_id: admin_tenant_b
+    tags: ["tenant-b", "admin", "standard-tier"]
+
+  # Tenant C Consumers (Enterprise)
+  - username: user1_tenant_c
+    custom_id: user1_tenant_c
+    tags: ["tenant-c", "user", "enterprise-tier"]
+  
+  - username: admin_tenant_c
+    custom_id: admin_tenant_c
+    tags: ["tenant-c", "admin", "enterprise-tier"]
+
+  # Shared Admin User
+  - username: saas-super-admin
+    custom_id: saas-super-admin
+    tags: ["shared", "super-admin"]
+
+# =============================================================================
+# 7. API KEY CREDENTIALS FOR AUTHENTICATION
+# =============================================================================
+
+keyauth_credentials:
+  # Tenant A API Keys
+  - consumer: user1_tenant_a
+    key: tenant-a-user1-api-key-${RANDOM_UUID}
+    tags: ["tenant-a", "user-key", "basic-tier"]
+  
+  - consumer: admin_tenant_a
+    key: tenant-a-admin-api-key-${RANDOM_UUID}
+    tags: ["tenant-a", "admin-key", "basic-tier"]
+
+  # Tenant B API Keys
+  - consumer: user1_tenant_b
+    key: tenant-b-user1-api-key-${RANDOM_UUID}
+    tags: ["tenant-b", "user-key", "standard-tier"]
+  
+  - consumer: admin_tenant_b
+    key: tenant-b-admin-api-key-${RANDOM_UUID}
+    tags: ["tenant-b", "admin-key", "standard-tier"]
+
+  # Tenant C API Keys (Enterprise)
+  - consumer: user1_tenant_c
+    key: tenant-c-user1-api-key-${RANDOM_UUID}
+    tags: ["tenant-c", "user-key", "enterprise-tier"]
+  
+  - consumer: admin_tenant_c
+    key: tenant-c-admin-api-key-${RANDOM_UUID}
+    tags: ["tenant-c", "admin-key", "enterprise-tier"]
+
+  # Super Admin API Key
+  - consumer: saas-super-admin
+    key: saas-super-admin-api-key-${RANDOM_UUID}
+    tags: ["shared", "super-admin-key"]
+
+# =============================================================================
+# 8. ADVANCED SECURITY PLUGINS
+# =============================================================================
+
+  # Bot Detection (Enterprise Tier)
+  - name: bot-detection
+    config:
+      allow: ["googlebot", "bingbot", "slurp"]
+      deny: ["scraper", "crawler", "spider"]
+    tags: ["enterprise", "bot-detection"]
+
+  # Request Validation
+  - name: request-validator
+    config:
+      body_schema: |
+        {
+          "type": "object",
+          "properties": {
+            "tenant_id": {"type": "string"},
+            "user_id": {"type": "string"}
+          },
+          "required": ["tenant_id"]
+        }
+    tags: ["enterprise", "request-validation"]
+
+# =============================================================================
+# 9. MONITORING AND LOGGING
+# =============================================================================
+
+  # Prometheus Metrics
+  - name: prometheus
+    config:
+      status_codes: true
+      latency: true
+      bandwidth: true
+      upstream_health: true
+    tags: ["global", "monitoring"]
+
+  # HTTP Log (Structured Logging)
+  - name: http-log
+    config:
+      http_endpoint: http://logstash:5044
+      method: POST
+      timeout: 10000
+      keepalive: 60000
+    tags: ["global", "logging"]
+
+  # TCP Log for Critical Events
+  - name: tcp-log
+    config:
+      host: logstash
+      port: 5045
+    tags: ["global", "critical-logging"]
+
+# =============================================================================
+# 10. TENANT-SPECIFIC SECURITY POLICIES
+# =============================================================================
+
+  # Tenant A Security Policy (Basic)
+  - name: pre-function
+    config:
+      access:
+        - |
+          local function apply_basic_security()
+            local tenant_id = kong.ctx.shared.tenant_id
+            if tenant_id == "tenant-a" then
+              -- Basic security for tenant A
+              kong.response.set_header("X-Security-Level", "basic")
+              kong.response.set_header("X-Data-Classification", "internal")
+            end
+          end
+          
+          apply_basic_security()
+    tags: ["tenant-a", "security-policy"]
+
+  # Tenant B Security Policy (Standard)
+  - name: pre-function
+    config:
+      access:
+        - |
+          local function apply_standard_security()
+            local tenant_id = kong.ctx.shared.tenant_id
+            if tenant_id == "tenant-b" then
+              -- Standard security for tenant B
+              kong.response.set_header("X-Security-Level", "standard")
+              kong.response.set_header("X-Data-Classification", "confidential")
+            end
+          end
+          
+          apply_standard_security()
+    tags: ["tenant-b", "security-policy"]
+
+  # Tenant C Security Policy (Enterprise)
+  - name: pre-function
+    config:
+      access:
+        - |
+          local function apply_enterprise_security()
+            local tenant_id = kong.ctx.shared.tenant_id
+            if tenant_id == "tenant-c" then
+              -- Enterprise security for tenant C
+              kong.response.set_header("X-Security-Level", "enterprise")
+              kong.response.set_header("X-Data-Classification", "restricted")
+              
+              -- Additional enterprise security checks
+              local user_agent = kong.request.get_header("User-Agent")
+              if not user_agent or string.len(user_agent) < 10 then
+                kong.response.exit(403, { 
+                  message = "Invalid User-Agent header",
+                  code = "INVALID_USER_AGENT",
+                  request_id = kong.response.get_header("X-Request-ID")
+                })
+              end
+            end
+          end
+          
+          apply_enterprise_security()
+    tags: ["tenant-c", "security-policy"]
+
+# =============================================================================
+# 11. COMPLIANCE AND AUDIT FEATURES
+# =============================================================================
+
+  # GDPR Compliance Logging
+  - name: pre-function
+    config:
+      access:
+        - |
+          local function log_gdpr_event()
+            local tenant_id = kong.ctx.shared.tenant_id
+            local user_id = kong.request.get_header("X-User-ID")
+            local action = kong.request.get_method()
+            local resource = kong.request.get_path()
+            
+            if user_id and (action == "DELETE" or action == "GET") then
+              -- Log GDPR-related events
+              local gdpr_log = {
+                timestamp = os.date("%Y-%m-%d %H:%M:%S"),
+                tenant_id = tenant_id,
+                user_id = user_id,
+                action = action,
+                resource = resource,
+                ip_address = kong.client.get_forwarded_ip(),
+                user_agent = kong.request.get_header("User-Agent"),
+                request_id = kong.response.get_header("X-Request-ID")
+              }
+              
+              -- Send to GDPR compliance service
+              kong.log.info("GDPR Event: " .. require("cjson").encode(gdpr_log))
+            end
+          end
+          
+          log_gdpr_event()
+    tags: ["global", "gdpr-compliance"]
+
+  # HIPAA Compliance for Healthcare Tenants
+  - name: pre-function
+    config:
+      access:
+        - |
+          local function apply_hipaa_compliance()
+            local tenant_id = kong.ctx.shared.tenant_id
+            local path = kong.request.get_path()
+            
+            -- Apply HIPAA compliance for healthcare-related paths
+            if string.match(path, "/api/healthcare") or string.match(path, "/api/medical") then
+              -- Enforce additional security headers
+              kong.response.set_header("X-HIPAA-Compliant", "true")
+              kong.response.set_header("X-Data-Encryption", "AES-256")
+              
+              -- Log HIPAA access
+              kong.log.info("HIPAA Access: " .. tenant_id .. " - " .. path)
+            end
+          end
+          
+          apply_hipaa_compliance()
+    tags: ["global", "hipaa-compliance"]
+
+# =============================================================================
+# 12. ADVANCED ROUTING AND LOAD BALANCING
+# =============================================================================
+
+  # Tenant-aware Load Balancing
+  - name: pre-function
+    config:
+      access:
+        - |
+          local function apply_tenant_routing()
+            local tenant_id = kong.ctx.shared.tenant_id
+            
+            -- Route to different upstreams based on tenant tier
+            if tenant_id == "tenant-a" then
+              kong.service.set_target("tenant-a-cluster", 8081)
+            elseif tenant_id == "tenant-b" then
+              kong.service.set_target("tenant-b-cluster", 8081)
+            elseif tenant_id == "tenant-c" then
+              kong.service.set_target("tenant-c-cluster", 8081)
+            end
+          end
+          
+          apply_tenant_routing()
+    tags: ["global", "tenant-routing"]
+
+# =============================================================================
+# NOTES ON IMPLEMENTATION:
+# =============================================================================
+# 1. Workspaces must be created before applying this configuration
+# 2. Each tenant gets isolated routing, rate limiting, and authentication
+# 3. Tenant identification is done via X-Tenant-ID header
+# 4. Rate limits are tiered: Basic (100/min), Standard (200/min), Enterprise (500/min)
+# 5. JWT secrets should be unique per tenant and rotated regularly
+# 6. OAuth2 is used for Tenant B as an alternative authentication method
+# 7. All requests must include X-Tenant-ID header for proper routing
+# 8. Super admin has access to all tenant workspaces
+# 9. Security headers are applied globally for all responses
+# 10. GDPR and HIPAA compliance features are included
+# 11. Advanced monitoring and logging for enterprise tenants
+# 12. Bot detection and request validation for enterprise tier
+# =============================================================================

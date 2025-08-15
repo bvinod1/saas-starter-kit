@@ -1,0 +1,313 @@
+spring:
+  application:
+    name: tenant-service
+    description: Centralized configuration management service for multi-tenant SaaS platform
+  
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  
+  # Database Configuration
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/saas_tenant_config}
+    username: ${DATABASE_USERNAME:saas_user}
+    password: ${DATABASE_PASSWORD:saas_password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+  
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    show-sql: ${JPA_SHOW_SQL:false}
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 50
+          fetch_size: 100
+        order_inserts: true
+        order_updates: true
+        batch_versioned_data: true
+        connection:
+          provider_disables_autocommit: true
+        cache:
+          use_second_level_cache: true
+          use_query_cache: true
+          region:
+            factory_class: org.hibernate.cache.jcache.JCacheRegionFactory
+        jcache:
+          provider: org.ehcache.jsr107.EhcacheCachingProvider
+  
+  # Redis Configuration for Caching
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+          max-wait: 1000ms
+  
+  # Cache Configuration
+  cache:
+    type: redis
+    redis:
+      time-to-live: 300000ms
+      cache-null-values: false
+      use-key-prefix: true
+      key-prefix: "tenant:"
+  
+  # Security Configuration
+  security:
+    user:
+      name: ${SECURITY_USER_NAME:admin}
+      password: ${SECURITY_USER_PASSWORD:admin123}
+      roles: ADMIN
+  
+  # Jackson Configuration
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+      fail-on-empty-beans: false
+    deserialization:
+      fail-on-unknown-properties: false
+    time-zone: UTC
+  
+  # Cloud Configuration
+  cloud:
+    config:
+      enabled: ${CONFIG_SERVER_ENABLED:false}
+      uri: ${CONFIG_SERVER_URI:http://localhost:8888}
+      fail-fast: false
+      retry:
+        initial-interval: 1000
+        max-interval: 2000
+        max-attempts: 6
+        multiplier: 1.1
+
+# Server Configuration
+server:
+  port: ${SERVER_PORT:8086}
+  servlet:
+    context-path: /api/tenant
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+    min-response-size: 1024
+
+# Management and Monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,configprops,env,loggers
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: always
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      sla:
+        http.server.requests: 10ms, 50ms, 100ms, 200ms, 500ms
+  health:
+    redis:
+      enabled: true
+    db:
+      enabled: true
+    defaults:
+      enabled: true
+
+# Logging Configuration
+logging:
+  level:
+    com.saasstarterkit.tenantconfig: ${LOG_LEVEL:INFO}
+    org.springframework.security: ${SECURITY_LOG_LEVEL:WARN}
+    org.hibernate.SQL: ${SQL_LOG_LEVEL:WARN}
+    org.hibernate.type.descriptor.sql.BasicBinder: ${SQL_PARAM_LOG_LEVEL:WARN}
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: ${LOG_FILE_PATH:logs/tenant-service.log}
+    max-size: 100MB
+    max-history: 30
+
+# Tenant Configuration Service Specific Settings
+  tenant:
+  # Encryption Settings
+  encryption:
+    enabled: ${ENCRYPTION_ENABLED:true}
+    algorithm: ${ENCRYPTION_ALGORITHM:AES}
+    key-size: ${ENCRYPTION_KEY_SIZE:256}
+    secret-key: ${ENCRYPTION_SECRET_KEY:}
+  
+  # Feature Flags
+  features:
+    audit-trail: ${FEATURE_AUDIT_TRAIL:true}
+    versioning: ${FEATURE_VERSIONING:true}
+    staged-rollouts: ${FEATURE_STAGED_ROLLOUTS:true}
+    approval-workflow: ${FEATURE_APPROVAL_WORKFLOW:true}
+    canary-deployments: ${FEATURE_CANARY_DEPLOYMENTS:true}
+    rollback: ${FEATURE_ROLLBACK:true}
+    encryption: ${FEATURE_ENCRYPTION:true}
+    validation: ${FEATURE_VALIDATION:true}
+  
+  # Rate Limiting
+  rate-limiting:
+    enabled: ${RATE_LIMITING_ENABLED:true}
+    default-limit: ${RATE_LIMIT_DEFAULT:100}
+    burst-limit: ${RATE_LIMIT_BURST:200}
+    window-size: ${RATE_LIMIT_WINDOW:60}
+  
+  # Caching
+  caching:
+    enabled: ${CACHING_ENABLED:true}
+    ttl: ${CACHE_TTL:300}
+    max-size: ${CACHE_MAX_SIZE:1000}
+  
+  # Validation
+  validation:
+    enabled: ${VALIDATION_ENABLED:true}
+    strict-mode: ${VALIDATION_STRICT_MODE:false}
+    custom-validators: ${VALIDATION_CUSTOM_VALIDATORS:true}
+  
+  # Monitoring
+  monitoring:
+    enabled: ${MONITORING_ENABLED:true}
+    metrics:
+      enabled: ${METRICS_ENABLED:true}
+      export:
+        prometheus: ${METRICS_PROMETHEUS:true}
+    tracing:
+      enabled: ${TRACING_ENABLED:true}
+      sampling-rate: ${TRACING_SAMPLING_RATE:0.1}
+  
+  # Security
+  security:
+    jwt:
+      enabled: ${JWT_ENABLED:true}
+      secret: ${JWT_SECRET:}
+      expiration: ${JWT_EXPIRATION:3600}
+    oauth2:
+      enabled: ${OAUTH2_ENABLED:false}
+      issuer: ${OAUTH2_ISSUER:}
+      audience: ${OAUTH2_AUDIENCE:}
+    rbac:
+      enabled: ${RBAC_ENABLED:true}
+      default-role: ${RBAC_DEFAULT_ROLE:USER}
+  
+  # Compliance
+  compliance:
+    gdpr:
+      enabled: ${GDPR_ENABLED:true}
+      data-retention-days: ${GDPR_RETENTION_DAYS:2555}
+    hipaa:
+      enabled: ${HIPAA_ENABLED:false}
+      audit-logging: ${HIPAA_AUDIT_LOGGING:true}
+    sox:
+      enabled: ${SOX_ENABLED:false}
+      change-tracking: ${SOX_CHANGE_TRACKING:true}
+  
+  # Backup and Recovery
+  backup:
+    enabled: ${BACKUP_ENABLED:true}
+    schedule: ${BACKUP_SCHEDULE:0 0 2 * * ?}
+    retention:
+      days: ${BACKUP_RETENTION_DAYS:30}
+      versions: ${BACKUP_RETENTION_VERSIONS:10}
+    storage:
+      type: ${BACKUP_STORAGE_TYPE:local}
+      path: ${BACKUP_STORAGE_PATH:backups}
+  
+  # Notifications
+  notifications:
+    enabled: ${NOTIFICATIONS_ENABLED:true}
+    channels:
+      email: ${NOTIFICATION_EMAIL:true}
+      slack: ${NOTIFICATION_SLACK:false}
+      webhook: ${NOTIFICATION_WEBHOOK:false}
+    events:
+      config-change: ${NOTIFY_CONFIG_CHANGE:true}
+      approval-required: ${NOTIFY_APPROVAL_REQUIRED:true}
+      deployment: ${NOTIFY_DEPLOYMENT:true}
+      rollback: ${NOTIFY_ROLLBACK:true}
+      error: ${NOTIFY_ERROR:true}
+
+# Integration Settings
+integration:
+  # Kong API Gateway Integration
+  kong:
+    enabled: ${KONG_INTEGRATION_ENABLED:true}
+    admin-url: ${KONG_ADMIN_URL:http://localhost:8001}
+    proxy-url: ${KONG_PROXY_URL:http://localhost:8000}
+    sync-interval: ${KONG_SYNC_INTERVAL:30000}
+  
+  # Keycloak Integration
+  keycloak:
+    enabled: ${KEYCLOAK_ENABLED:false}
+    auth-server-url: ${KEYCLOAK_AUTH_SERVER_URL:}
+    realm: ${KEYCLOAK_REALM:}
+    client-id: ${KEYCLOAK_CLIENT_ID:}
+    client-secret: ${KEYCLOAK_CLIENT_SECRET:}
+  
+  # External Config Services
+  external-config:
+    vault:
+      enabled: ${VAULT_ENABLED:false}
+      url: ${VAULT_URL:}
+      token: ${VAULT_TOKEN:}
+      path: ${VAULT_PATH:secret/tenant}
+    aws-parameter-store:
+      enabled: ${AWS_PARAMETER_STORE_ENABLED:false}
+      region: ${AWS_REGION:us-east-1}
+      path: ${AWS_PARAMETER_PATH:/tenant}
+
+# Development and Testing
+dev:
+  # Development-specific settings
+  h2-console:
+    enabled: ${H2_CONSOLE_ENABLED:false}
+  test-data:
+    enabled: ${TEST_DATA_ENABLED:false}
+    tenant-count: ${TEST_TENANT_COUNT:3}
+    config-per-tenant: ${TEST_CONFIG_PER_TENANT:10}
+
+# Production Settings
+prod:
+  # Production-specific settings
+  security:
+    require-ssl: ${PROD_REQUIRE_SSL:true}
+    cors:
+      allowed-origins: ${PROD_CORS_ORIGINS:}
+      allowed-methods: ${PROD_CORS_METHODS:GET,POST,PUT,DELETE}
+      allowed-headers: ${PROD_CORS_HEADERS:*}
+  monitoring:
+    alerting:
+      enabled: ${PROD_ALERTING_ENABLED:true}
+      slack-webhook: ${PROD_SLACK_WEBHOOK:}
+      email: ${PROD_ALERT_EMAIL:}

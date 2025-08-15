@@ -47,8 +47,8 @@ public class SmsChannelProvider implements NotificationChannelProvider {
     // =============================================
     
     @Override
-    public Notification.NotificationChannel getChannelType() {
-        return Notification.NotificationChannel.SMS;
+    public com.saasstarterkit.notification.domain.enums.NotificationChannel getChannelType() {
+        return com.saasstarterkit.notification.domain.enums.NotificationChannel.SMS;
     }
     
     @Override

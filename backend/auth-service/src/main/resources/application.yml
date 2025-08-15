@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 8085
 
 spring:
   application:
@@ -74,6 +74,21 @@ jwt:
   secret: ${JWT_SECRET:DUO9HD24VrhZWLnypYn/gKpcihfBBkKl7wfaNKUPPOs=}
   expiration: 86400000 # 24 hours in milliseconds
   refresh-expiration: 604800000 # 7 days in milliseconds
+
+# Keycloak Configuration
+keycloak:
+  auth-server-url: http://localhost:8080
+  realm: saas-starter-kit
+  client-id: saas-backend
+  client-secret: xSOcHdTscmj8TGAbZUazs0gkkgSTjBXN
+  admin:
+    username: admin
+    password: admin123
+  token:
+    access-token-lifespan: 300 # 5 minutes in seconds
+    refresh-token-lifespan: 3600 # 1 hour in seconds
+    sso-session-idle: 1800 # 30 minutes in seconds
+    sso-session-max: 28800 # 8 hours in seconds
 
 # Application Configuration
 app:

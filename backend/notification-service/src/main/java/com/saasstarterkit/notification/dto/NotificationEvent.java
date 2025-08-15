@@ -1,8 +1,8 @@
 package com.saasstarterkit.notification.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.saasstarterkit.notification.entity.Notification.NotificationChannel;
-import com.saasstarterkit.notification.entity.Notification.NotificationPriority;
+import com.saasstarterkit.notification.domain.enums.NotificationChannel;
+import com.saasstarterkit.notification.domain.enums.NotificationPriority;
 
 import java.time.LocalDateTime;
 import java.util.Map;

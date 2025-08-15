@@ -2,7 +2,7 @@ _format_version: "3.0"
 
 services:
   - name: auth-service
-    url: http://host.docker.internal:8080
+    url: http://host.docker.internal:8085
     routes:
       - name: auth-routes
         paths:
@@ -34,6 +34,14 @@ services:
       - name: user-routes
         paths:
           - /api/users
+        strip_path: true
+      - name: tenant-routes
+        paths:
+          - /api/tenants
+        strip_path: true
+      - name: organization-routes
+        paths:
+          - /api/organizations
         strip_path: true
     plugins:
       - name: cors
@@ -143,4 +151,4 @@ consumers:
 
 keyauth_credentials:
   - consumer: saas-admin
-    key: admin-api-key 
+    key: admin-api-key

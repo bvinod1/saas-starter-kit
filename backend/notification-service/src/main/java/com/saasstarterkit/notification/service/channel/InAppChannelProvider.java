@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -51,8 +52,8 @@ public class InAppChannelProvider implements NotificationChannelProvider {
     // =============================================
     
     @Override
-    public Notification.NotificationChannel getChannelType() {
-        return Notification.NotificationChannel.IN_APP;
+    public com.saasstarterkit.notification.domain.enums.NotificationChannel getChannelType() {
+        return com.saasstarterkit.notification.domain.enums.NotificationChannel.IN_APP;
     }
     
     @Override
@@ -228,19 +229,19 @@ public class InAppChannelProvider implements NotificationChannelProvider {
      */
     private Map<String, Object> buildNotificationPayload(Notification notification, 
                                                         UserNotificationPreferences preferences) {
-        return Map.of(
-            "id", notification.getId(),
-            "type", "IN_APP",
-            "title", notification.getTitle() != null ? notification.getTitle() : "Notification",
-            "message", notification.getMessage(),
-            "priority", notification.getPriority().toString(),
-            "category", notification.getSourceEvent() != null ? notification.getSourceEvent() : "general",
-            "timestamp", LocalDateTime.now().toString(),
-            "read", false,
-            "data", notification.getData() != null ? notification.getData() : "",
-            "userId", notification.getUserId(),
-            "tenantId", notification.getTenantId()
-        );
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("id", notification.getId());
+        payload.put("type", "IN_APP");
+        payload.put("title", notification.getTitle() != null ? notification.getTitle() : "Notification");
+        payload.put("message", notification.getMessage());
+        payload.put("priority", notification.getPriority().toString());
+        payload.put("category", notification.getSourceEvent() != null ? notification.getSourceEvent() : "general");
+        payload.put("timestamp", LocalDateTime.now().toString());
+        payload.put("read", false);
+        payload.put("data", notification.getData() != null ? notification.getData() : "");
+        payload.put("userId", notification.getUserId());
+        payload.put("tenantId", notification.getTenantId());
+        return payload;
     }
     
     /**

@@ -1,0 +1,178 @@
+receivers:
+  # OTLP receiver for gRPC
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        tls:
+          insecure: true
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - "http://localhost:3000"
+            - "http://localhost:3001"
+        tls:
+          insecure: true
+
+  # Jaeger receiver for backward compatibility
+  jaeger:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:14250
+      thrift_http:
+        endpoint: 0.0.0.0:14268
+
+  # Zipkin receiver for backward compatibility
+  zipkin:
+    endpoint: 0.0.0.0:9411
+
+processors:
+  # Batch processor for efficient processing
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  # Resource processor to add service information
+  resource:
+    attributes:
+      - key: environment
+        value: "development"
+        action: upsert
+      - key: platform
+        value: "multi-tenant-saas"
+        action: upsert
+      - key: data_governance
+        value: "enabled"
+        action: upsert
+
+  # Attributes processor to add business context
+  attributes:
+    actions:
+      - key: business.tenant.id
+        from_attribute: tenant_id
+        action: insert
+      - key: business.user.id
+        from_attribute: user_id
+        action: insert
+      - key: business.operation
+        from_attribute: operation
+        action: insert
+      - key: compliance.level
+        from_attribute: compliance_level
+        action: insert
+      - key: data.sensitivity
+        from_attribute: data_sensitivity
+        action: insert
+      - key: audit.required
+        from_attribute: audit_required
+        action: insert
+
+  # Filter processor to filter out unwanted spans
+  filter:
+    spans:
+      include:
+        match_type: regexp
+        services: [".*"]
+        attributes:
+          - key: business.tenant.id
+            value: ".*"
+        # Exclude health check and metrics endpoints
+        exclude:
+          match_type: regexp
+          attributes:
+            - key: http.url
+              value: ".*/(health|metrics|actuator).*"
+
+  # Sampling processor for production environments
+  probabilistic_sampler:
+    hash_seed: 22
+    sampling_percentage: 100
+
+exporters:
+  # OTLP exporter to Elastic APM
+  otlp/elastic:
+    endpoint: "http://apm-server:8200"
+    tls:
+      insecure: true
+    headers:
+      Authorization: "Bearer apm_secret_token"
+
+  # Logging exporter for debugging
+  logging:
+    loglevel: debug
+    sampling_initial: 1
+    sampling_thereafter: 1
+
+  # Jaeger exporter for local debugging
+  jaeger:
+    endpoint: "jaeger:14250"
+    tls:
+      insecure: true
+
+  # Zipkin exporter for local debugging
+  zipkin:
+    endpoint: "http://zipkin:9411/api/v2/spans"
+    tls:
+      insecure: true
+
+  # Prometheus exporter for metrics
+  prometheus:
+    endpoint: "0.0.0.0:9464"
+    namespace: "otel"
+    const_labels:
+      label1: value1
+    send_timestamps: true
+    metric_expiration: 180m
+    enable_open_metrics: true
+
+extensions:
+  # Health check extension
+  health_check:
+    endpoint: "0.0.0.0:13133"
+
+  # zpages extension for debugging
+  zpages:
+    endpoint: "0.0.0.0:55679"
+
+  # pprof extension for profiling
+  pprof:
+    endpoint: "0.0.0.0:1777"
+
+  # Basic auth extension
+  basic_auth:
+    htpasswd:
+      inline: "admin:$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi"
+
+service:
+  extensions: [health_check, zpages, pprof]
+  pipelines:
+    traces:
+      receivers: [otlp, jaeger, zipkin]
+      processors: [batch, resource, attributes, filter, probabilistic_sampler]
+      exporters: [otlp/elastic, logging, jaeger, zipkin]
+    metrics:
+      receivers: [otlp]
+      processors: [batch, resource]
+      exporters: [prometheus, logging]
+    logs:
+      receivers: [otlp]
+      processors: [batch, resource]
+      exporters: [logging]
+
+  telemetry:
+    logs:
+      level: "debug"
+      development: true
+      encoding: "console"
+      disable_caller: false
+      disable_stacktrace: false
+      sampling:
+        initial: 1
+        thereafter: 1
+      output_paths: ["stdout"]
+      error_output_paths: ["stderr"]
+      initial_fields:
+        component: "otel-collector"
+        version: "1.0.0"

@@ -1,0 +1,94 @@
+server:
+  port: 8086
+  servlet:
+    context-path: /api/organizational-management
+
+spring:
+  application:
+    name: organisation-service
+  
+  datasource:
+    url: jdbc:postgresql://localhost:5432/saas_starter_kit
+    username: saas_user
+    password: saas_password
+    driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+  
+  redis:
+    host: localhost
+    port: 6379
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+  
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000
+      cache-null-values: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    com.saasstarterkit.organizationalmanagement: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# JWT Configuration
+jwt:
+  secret: organizational-management-jwt-secret-key-change-in-production
+  expiration: 86400000 # 24 hours
+
+# Tenant Configuration
+tenant:
+  default-plan: starter
+  trial-days: 14
+  max-users:
+    starter: 5
+    professional: 25
+    enterprise: 1000
+  
+# Audit Configuration
+audit:
+  enabled: true
+  retention-days: 2555 # 7 years
+  
+# Compliance Configuration
+compliance:
+  gdpr:
+    enabled: true
+    data-retention-days: 2555
+  hipaa:
+    enabled: false
+    audit-logging: true

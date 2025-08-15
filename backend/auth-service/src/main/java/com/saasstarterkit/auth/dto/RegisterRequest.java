@@ -18,6 +18,10 @@ public class RegisterRequest {
     @Email(message = "Email should be valid")
     private String email;
     
+    @NotBlank(message = "Organization name is required")
+    @Size(min = 2, max = 100, message = "Organization name must be between 2 and 100 characters")
+    private String organizationName;
+    
     @NotBlank(message = "Password is required")
     @Size(min = 8, max = 100, message = "Password must be between 8 and 100 characters")
     private String password;
@@ -28,10 +32,11 @@ public class RegisterRequest {
     // Constructors
     public RegisterRequest() {}
 
-    public RegisterRequest(String firstName, String lastName, String email, String password, String confirmPassword) {
+    public RegisterRequest(String firstName, String lastName, String email, String organizationName, String password, String confirmPassword) {
         this.firstName = firstName;
         this.lastName = lastName;
         this.email = email;
+        this.organizationName = organizationName;
         this.password = password;
         this.confirmPassword = confirmPassword;
     }
@@ -59,6 +64,14 @@ public class RegisterRequest {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getOrganizationName() {
+        return organizationName;
+    }
+
+    public void setOrganizationName(String organizationName) {
+        this.organizationName = organizationName;
     }
 
     public String getPassword() {

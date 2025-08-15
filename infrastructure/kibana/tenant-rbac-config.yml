@@ -1,0 +1,347 @@
+# Kibana RBAC Configuration for Multi-Tenant SaaS
+# This configuration ensures tenant data isolation and secure access control
+
+# Elasticsearch Security Configuration
+elasticsearch:
+  security:
+    enabled: true
+    ssl:
+      enabled: true
+      certificate: /etc/elasticsearch/certs/elasticsearch.crt
+      key: /etc/elasticsearch/certs/elasticsearch.key
+      ca: /etc/elasticsearch/certs/ca.crt
+
+# Kibana Security Configuration
+kibana:
+  security:
+    enabled: true
+    ssl:
+      enabled: true
+      certificate: /etc/kibana/certs/kibana.crt
+      key: /etc/kibana/certs/kibana.key
+      ca: /etc/kibana/certs/ca.crt
+
+# Tenant Isolation Configuration
+tenant_isolation:
+  enabled: true
+  strategy: "index_pattern"
+  default_tenant: "public"
+  security_violation_tenant: "security_violation"
+
+# Role-Based Access Control (RBAC) Configuration
+rbac:
+  # Super Admin Role - Full access to all tenants
+  super_admin:
+    name: "super_admin"
+    description: "Super Administrator with access to all tenants and system configuration"
+    privileges:
+      - "all"
+    restrictions:
+      - "none"
+    metadata:
+      tenant_access: "all"
+      security_level: "maximum"
+      compliance_level: "all"
+
+  # Tenant Admin Role - Full access to specific tenant
+  tenant_admin:
+    name: "tenant_admin_{tenant_id}"
+    description: "Tenant Administrator with full access to specific tenant data"
+    privileges:
+      cluster:
+        - "monitor"
+        - "cluster:monitor/health"
+      indices:
+        - "read"
+        - "write"
+        - "delete"
+        - "create_index"
+        - "manage"
+      kibana:
+        - "all"
+    restrictions:
+      indices:
+        - "saas-logs-{tenant_id}-*"
+        - "saas-metrics-{tenant_id}-*"
+        - "saas-traces-{tenant_id}-*"
+      kibana:
+        - "tenant_{tenant_id}_*"
+    metadata:
+      tenant_access: "specific"
+      tenant_id: "{tenant_id}"
+      security_level: "high"
+      compliance_level: "tenant_specific"
+
+  # Tenant User Role - Limited access to specific tenant
+  tenant_user:
+    name: "tenant_user_{tenant_id}"
+    description: "Tenant User with limited access to specific tenant data"
+    privileges:
+      cluster:
+        - "monitor"
+      indices:
+        - "read"
+        - "write"
+      kibana:
+        - "read"
+        - "dashboard"
+        - "visualize"
+        - "discover"
+    restrictions:
+      indices:
+        - "saas-logs-{tenant_id}-*"
+        - "saas-metrics-{tenant_id}-*"
+      kibana:
+        - "tenant_{tenant_id}_*"
+    metadata:
+      tenant_access: "specific"
+      tenant_id: "{tenant_id}"
+      security_level: "medium"
+      compliance_level: "tenant_specific"
+
+  # Tenant Read-Only Role - Read-only access to specific tenant
+  tenant_readonly:
+    name: "tenant_readonly_{tenant_id}"
+    description: "Tenant Read-Only User with read access to specific tenant data"
+    privileges:
+      cluster:
+        - "monitor"
+      indices:
+        - "read"
+      kibana:
+        - "read"
+        - "dashboard"
+        - "visualize"
+        - "discover"
+    restrictions:
+      indices:
+        - "saas-logs-{tenant_id}-*"
+        - "saas-metrics-{tenant_id}-*"
+      kibana:
+        - "tenant_{tenant_id}_*"
+    metadata:
+      tenant_access: "specific"
+      tenant_id: "{tenant_id}"
+      security_level: "medium"
+      compliance_level: "tenant_specific"
+
+  # Compliance Auditor Role - Access to compliance data across tenants
+  compliance_auditor:
+    name: "compliance_auditor"
+    description: "Compliance Auditor with access to compliance and audit data"
+    privileges:
+      cluster:
+        - "monitor"
+      indices:
+        - "read"
+      kibana:
+        - "read"
+        - "dashboard"
+        - "visualize"
+        - "discover"
+    restrictions:
+      indices:
+        - "saas-logs-*-*"
+        - "saas-audit-*-*"
+      kibana:
+        - "compliance_*"
+        - "audit_*"
+    metadata:
+      tenant_access: "compliance_only"
+      security_level: "high"
+      compliance_level: "all"
+
+  # Security Analyst Role - Access to security events across tenants
+  security_analyst:
+    name: "security_analyst"
+    description: "Security Analyst with access to security events and alerts"
+    privileges:
+      cluster:
+        - "monitor"
+      indices:
+        - "read"
+        - "write"
+      kibana:
+        - "read"
+        - "dashboard"
+        - "visualize"
+        - "discover"
+        - "alerting"
+    restrictions:
+      indices:
+        - "saas-logs-*-*"
+        - "saas-security-*-*"
+        - "saas-alerts-*-*"
+      kibana:
+        - "security_*"
+        - "alerting_*"
+    metadata:
+      tenant_access: "security_only"
+      security_level: "maximum"
+      compliance_level: "security_events"
+
+# Tenant-Specific Dashboard Configuration
+tenant_dashboards:
+  # Default dashboard for each tenant
+  default:
+    name: "tenant_{tenant_id}_overview"
+    description: "Overview dashboard for tenant {tenant_id}"
+    index_pattern: "saas-logs-{tenant_id}-*"
+    visualizations:
+      - "tenant_logs_overview"
+      - "tenant_performance_metrics"
+      - "tenant_error_rates"
+      - "tenant_user_activity"
+      - "tenant_compliance_status"
+
+  # Security dashboard for each tenant
+  security:
+    name: "tenant_{tenant_id}_security"
+    description: "Security dashboard for tenant {tenant_id}"
+    index_pattern: "saas-logs-{tenant_id}-*"
+    visualizations:
+      - "tenant_security_events"
+      - "tenant_access_patterns"
+      - "tenant_compliance_violations"
+      - "tenant_audit_trail"
+
+  # Performance dashboard for each tenant
+  performance:
+    name: "tenant_{tenant_id}_performance"
+    description: "Performance dashboard for tenant {tenant_id}"
+    index_pattern: "saas-metrics-{tenant_id}-*"
+    visualizations:
+      - "tenant_response_times"
+      - "tenant_throughput"
+      - "tenant_error_rates"
+      - "tenant_resource_usage"
+
+# Index Pattern Configuration
+index_patterns:
+  # Tenant-specific log patterns
+  tenant_logs:
+    pattern: "saas-logs-{tenant_id}-*"
+    title: "Tenant {tenant_id} Logs"
+    timeFieldName: "@timestamp"
+    fields:
+      - "tenant_id"
+      - "tenant_name"
+      - "user_id"
+      - "correlation_id"
+      - "level"
+      - "message"
+      - "compliance_level"
+      - "data_sensitivity"
+
+  # Tenant-specific metrics patterns
+  tenant_metrics:
+    pattern: "saas-metrics-{tenant_id}-*"
+    title: "Tenant {tenant_id} Metrics"
+    timeFieldName: "@timestamp"
+    fields:
+      - "tenant_id"
+      - "metric_name"
+      - "metric_value"
+      - "metric_type"
+      - "performance_operation"
+
+  # Tenant-specific trace patterns
+  tenant_traces:
+    pattern: "saas-traces-{tenant_id}-*"
+    title: "Tenant {tenant_id} Traces"
+    timeFieldName: "@timestamp"
+    fields:
+      - "tenant_id"
+      - "trace_id"
+      - "span_id"
+      - "operation_name"
+      - "duration_ms"
+
+# Security Policy Configuration
+security_policies:
+  # Data access policies
+  data_access:
+    - name: "tenant_data_isolation"
+      description: "Ensure tenant data isolation"
+      rules:
+        - "indices:data/read/saas-logs-{tenant_id}-*"
+        - "indices:data/write/saas-logs-{tenant_id}-*"
+      conditions:
+        - "user.tenant_id == index.tenant_id"
+
+  # Compliance policies
+  compliance:
+    - name: "compliance_data_access"
+      description: "Control access to compliance data"
+      rules:
+        - "indices:data/read/saas-audit-*-*"
+        - "indices:data/read/saas-compliance-*-*"
+      conditions:
+        - "user.role == 'compliance_auditor'"
+
+  # Security policies
+  security:
+    - name: "security_data_access"
+      description: "Control access to security data"
+      rules:
+        - "indices:data/read/saas-security-*-*"
+        - "indices:data/read/saas-alerts-*-*"
+      conditions:
+        - "user.role == 'security_analyst'"
+
+# Audit Configuration
+audit:
+  enabled: true
+  events:
+    - "authentication_success"
+    - "authentication_failure"
+    - "authorization_granted"
+    - "authorization_denied"
+    - "indices_access_granted"
+    - "indices_access_denied"
+    - "kibana_login_success"
+    - "kibana_login_failure"
+    - "kibana_dashboard_access"
+    - "kibana_visualization_access"
+    - "kibana_discover_access"
+  log_level: "INFO"
+  include_request_body: false
+  include_response_body: false
+  exclude_sensitive_headers: true
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  metrics:
+    - "kibana_requests_total"
+    - "kibana_requests_duration"
+    - "kibana_errors_total"
+    - "elasticsearch_requests_total"
+    - "elasticsearch_requests_duration"
+    - "elasticsearch_errors_total"
+  alerts:
+    - name: "high_error_rate"
+      condition: "kibana_errors_total > 100"
+      action: "notify_security_team"
+    - name: "unauthorized_access_attempts"
+      condition: "authentication_failure > 10"
+      action: "notify_security_team"
+    - name: "cross_tenant_access_attempts"
+      condition: "authorization_denied > 5"
+      action: "notify_security_team"
+
+# Backup and Recovery Configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention:
+    daily: 7
+    weekly: 4
+    monthly: 12
+  storage:
+    type: "s3"
+    bucket: "kibana-backups"
+    path: "tenant-rbac-config"
+  encryption:
+    enabled: true
+    algorithm: "AES-256-GCM"

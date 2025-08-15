@@ -97,4 +97,57 @@ public class AuthController {
                     .body(RegisterResponse.error("Login failed. Please try again."));
         }
     }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<Map<String, Object>> refreshToken(@RequestBody Map<String, String> request) {
+        try {
+            String refreshToken = request.get("refreshToken");
+            if (refreshToken == null || refreshToken.trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Refresh token is required"));
+            }
+
+            var tokenResponse = authService.refreshToken(refreshToken);
+            Map<String, Object> response = new HashMap<>();
+            response.put("accessToken", tokenResponse.getAccessToken());
+            response.put("refreshToken", tokenResponse.getRefreshToken());
+            response.put("expiresIn", tokenResponse.getExpiresIn());
+            response.put("tokenType", tokenResponse.getTokenType());
+            response.put("message", "Token refreshed successfully");
+            
+            return ResponseEntity.ok(response);
+        } catch (ValidationException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Token refresh failed. Please try again."));
+        }
+    }
+
+    @PostMapping("/validate")
+    public ResponseEntity<Map<String, Object>> validateToken(@RequestBody Map<String, String> request) {
+        try {
+            String token = request.get("token");
+            if (token == null || token.trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Token is required"));
+            }
+
+            boolean isValid = authService.validateToken(token);
+            boolean isExpired = authService.isTokenExpired(token);
+            long expirationTime = authService.getTokenExpirationTime(token);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("valid", isValid);
+            response.put("expired", isExpired);
+            response.put("expirationTime", expirationTime);
+            response.put("currentTime", System.currentTimeMillis() / 1000);
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Token validation failed"));
+        }
+    }
 } 

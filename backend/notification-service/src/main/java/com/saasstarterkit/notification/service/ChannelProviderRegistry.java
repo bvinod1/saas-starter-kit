@@ -23,7 +23,7 @@ public class ChannelProviderRegistry {
     
     private static final Logger logger = LoggerFactory.getLogger(ChannelProviderRegistry.class);
     
-    private final Map<Notification.NotificationChannel, NotificationChannelProvider> providers = new ConcurrentHashMap<>();
+    private final Map<com.saasstarterkit.notification.domain.enums.NotificationChannel, NotificationChannelProvider> providers = new ConcurrentHashMap<>();
     
     // =============================================
     // CONSTRUCTOR
@@ -33,7 +33,7 @@ public class ChannelProviderRegistry {
     public ChannelProviderRegistry(List<NotificationChannelProvider> channelProviders) {
         // Register all available channel providers
         channelProviders.forEach(provider -> {
-            Notification.NotificationChannel channelType = provider.getChannelType();
+            com.saasstarterkit.notification.domain.enums.NotificationChannel channelType = provider.getChannelType();
             providers.put(channelType, provider);
             logger.info("Registered channel provider: {} for channel: {}", 
                        provider.getClass().getSimpleName(), channelType);
@@ -56,21 +56,21 @@ public class ChannelProviderRegistry {
     /**
      * Get provider for a specific channel
      */
-    public NotificationChannelProvider getProvider(Notification.NotificationChannel channel) {
+    public NotificationChannelProvider getProvider(com.saasstarterkit.notification.domain.enums.NotificationChannel channel) {
         return providers.get(channel);
     }
     
     /**
      * Check if a channel is supported
      */
-    public boolean isChannelSupported(Notification.NotificationChannel channel) {
+    public boolean isChannelSupported(com.saasstarterkit.notification.domain.enums.NotificationChannel channel) {
         return providers.containsKey(channel);
     }
     
     /**
      * Get all supported channels
      */
-    public List<Notification.NotificationChannel> getSupportedChannels() {
+    public List<com.saasstarterkit.notification.domain.enums.NotificationChannel> getSupportedChannels() {
         return List.copyOf(providers.keySet());
     }
     
@@ -86,7 +86,7 @@ public class ChannelProviderRegistry {
     /**
      * Get provider configuration for all channels
      */
-    public Map<Notification.NotificationChannel, NotificationChannelProvider.ChannelConfiguration> getAllConfigurations() {
+    public Map<com.saasstarterkit.notification.domain.enums.NotificationChannel, NotificationChannelProvider.ChannelConfiguration> getAllConfigurations() {
         return providers.entrySet().stream()
                 .collect(Collectors.toMap(
                     Map.Entry::getKey,
@@ -97,7 +97,7 @@ public class ChannelProviderRegistry {
     /**
      * Get provider metadata for all channels
      */
-    public Map<Notification.NotificationChannel, NotificationChannelProvider.ChannelMetadata> getAllMetadata() {
+    public Map<com.saasstarterkit.notification.domain.enums.NotificationChannel, NotificationChannelProvider.ChannelMetadata> getAllMetadata() {
         return providers.entrySet().stream()
                 .collect(Collectors.toMap(
                     Map.Entry::getKey,
@@ -143,7 +143,7 @@ public class ChannelProviderRegistry {
     public List<NotificationChannelProvider.DeliveryResult> sendToMultipleChannels(
             Notification notification, 
             UserNotificationPreferences preferences, 
-            List<Notification.NotificationChannel> channels) {
+            List<com.saasstarterkit.notification.domain.enums.NotificationChannel> channels) {
         
         return channels.stream()
                 .filter(providers::containsKey)
@@ -204,7 +204,7 @@ public class ChannelProviderRegistry {
     /**
      * Get provider health status
      */
-    public Map<Notification.NotificationChannel, Boolean> getProviderHealthStatus() {
+    public Map<com.saasstarterkit.notification.domain.enums.NotificationChannel, Boolean> getProviderHealthStatus() {
         return providers.entrySet().stream()
                 .collect(Collectors.toMap(
                     Map.Entry::getKey,
@@ -220,13 +220,26 @@ public class ChannelProviderRegistry {
      * Get channel priority for provider selection
      * Lower number = higher priority
      */
-    private int getChannelPriority(Notification.NotificationChannel channel) {
+    private int getChannelPriority(com.saasstarterkit.notification.domain.enums.NotificationChannel channel) {
         return switch (channel) {
             case IN_APP -> 1;    // Highest priority - instant delivery
             case PUSH -> 2;       // High priority - mobile push
             case SMS -> 3;        // Medium priority - reliable
             case EMAIL -> 4;      // Lower priority - slower but reliable
             case WEBHOOK -> 5;    // Lowest priority - external dependency
+            case SLACK -> 6;      // External integration
+            case TEAMS -> 6;      // External integration
+            case DISCORD -> 6;    // External integration
+            case WHATSAPP -> 7;   // External messaging
+            case TELEGRAM -> 7;   // External messaging
+            case VOICE -> 8;      // Voice calls
+            case FAX -> 9;        // Fax
+            case LETTER -> 10;    // Physical mail
+            case MOBILE_APP -> 2; // Same as PUSH
+            case DESKTOP_APP -> 2; // Same as PUSH
+            case BROWSER -> 2;    // Same as PUSH
+            case SOCIAL_MEDIA -> 6; // External integration
+            case CUSTOM -> 11;    // Custom implementations
         };
     }
     

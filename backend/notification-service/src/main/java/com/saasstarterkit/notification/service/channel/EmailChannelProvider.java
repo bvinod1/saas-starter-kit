@@ -44,8 +44,8 @@ public class EmailChannelProvider implements NotificationChannelProvider {
     // =============================================
     
     @Override
-    public Notification.NotificationChannel getChannelType() {
-        return Notification.NotificationChannel.EMAIL;
+    public com.saasstarterkit.notification.domain.enums.NotificationChannel getChannelType() {
+        return com.saasstarterkit.notification.domain.enums.NotificationChannel.EMAIL;
     }
     
     @Override

@@ -1,0 +1,158 @@
+# Production Environment Properties
+# This file is committed to version control
+
+spring:
+  profiles:
+    active: prod
+  application:
+    name: "SaaS Starter Kit - User Service (PROD)"
+
+# Environment-specific overrides
+app:
+  environment: "production"
+  debug: false
+
+# Logging Configuration (Production)
+logging:
+  level:
+    root: WARN
+    com.saasstarterkit: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+    org.springframework.web: WARN
+    org.springframework.transaction: WARN
+
+# Database Configuration (Production)
+spring:
+  datasource:
+    url: "${DATABASE_URL}"
+    username: "${DATABASE_USERNAME}"
+    password: "${DATABASE_PASSWORD}"
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  
+  jpa:
+    hibernate:
+      ddl_auto: validate
+    show_sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        use_sql_comments: false
+
+# OpenTelemetry Configuration (Production)
+opentelemetry:
+  sampling:
+    probability: 0.1  # Sample 10% of traces in production
+  exporter:
+    endpoint: "${OTEL_EXPORTER_ENDPOINT}"
+    timeout: 30000
+
+# Feature Flags (Production)
+features:
+  debug_mode: false
+  mock_external_services: false
+  detailed_error_messages: false
+
+# Security Configuration (Production)
+security:
+  jwt:
+    expiration: 3600  # 1 hour for production
+    refresh_expiration: 604800  # 7 days for production
+  session:
+    timeout: 1800  # 30 minutes for production
+
+# Cache Configuration (Production)
+cache:
+  default_ttl: 1800  # 30 minutes TTL for production
+  max_size: 10000
+
+# Monitoring Configuration (Production)
+monitoring:
+  health_check:
+    interval: 60000  # Less frequent checks in production
+  metrics:
+    export:
+      prometheus: true
+      jmx: false  # Disable JMX in production
+
+# Production-specific endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics,prometheus"
+  endpoint:
+    health:
+      show-details: when-authorized
+    env:
+      show-values: never
+    beans:
+      show-uninitialized-fields: never
+
+# Production server configuration
+server:
+  port: 8081
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
+
+# Production-specific external service endpoints
+external:
+  services:
+    auth_service: "${AUTH_SERVICE_URL}"
+    notification_service: "${NOTIFICATION_SERVICE_URL}"
+    billing_service: "${BILLING_SERVICE_URL}"
+    elasticsearch: "${ELASTICSEARCH_URL}"
+    redis: "${REDIS_HOST}:${REDIS_PORT}"
+
+# Production-specific compliance settings
+compliance:
+  audit:
+    enabled: true
+    retention_days: 3650  # 10 years retention for production
+  gdpr:
+    data_retention_days: 2555  # 7 years for GDPR compliance
+  hipaa:
+    phi_encryption: true
+
+# Performance tuning for production
+spring:
+  jpa:
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+        batch_versioned_data: true
+        cache:
+          use_second_level_cache: true
+          use_query_cache: true
+          region:
+            factory_class: org.hibernate.cache.jcache.JCacheRegionFactory
+
+# Connection pooling optimization
+spring:
+  datasource:
+    hikari:
+      leak-detection-threshold: 60000
+      connection-test-query: "SELECT 1"
+      validation-timeout: 5000
+      register-mbeans: false
+
+# Security hardening
+security:
+  require-ssl: true
+  headers:
+    hsts: true
+    content-security-policy: true
+    x-frame-options: DENY
+    x-content-type-options: nosniff
+    x-xss-protection: "1; mode=block"

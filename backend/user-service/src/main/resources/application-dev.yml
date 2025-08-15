@@ -1,0 +1,122 @@
+# Development Environment Properties
+# This file is committed to version control
+
+spring:
+  profiles:
+    active: dev
+  application:
+    name: "SaaS Starter Kit - User Service (DEV)"
+
+# Environment-specific overrides
+app:
+  environment: "development"
+  debug: true
+
+# Logging Configuration (Development)
+logging:
+  level:
+    root: DEBUG
+    com.saasstarterkit: TRACE
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.web: DEBUG
+    org.springframework.transaction: DEBUG
+
+# Database Configuration (Development)
+spring:
+  datasource:
+    url: "jdbc:postgresql://localhost:5432/saas_starter_dev"
+    username: "${DB_USERNAME:dev_user}"
+    password: "${DB_PASSWORD:dev_password}"
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 20000
+      idle-timeout: 300000
+      max-lifetime: 1200000
+  
+  jpa:
+    hibernate:
+      ddl_auto: update
+    show_sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+
+# OpenTelemetry Configuration (Development)
+opentelemetry:
+  sampling:
+    probability: 1.0
+  exporter:
+    endpoint: "http://localhost:4317"
+    timeout: 10000
+
+# Feature Flags (Development)
+features:
+  debug_mode: true
+  mock_external_services: true
+  detailed_error_messages: true
+
+# Security Configuration (Development)
+security:
+  jwt:
+    expiration: 86400  # 24 hours for development
+    refresh_expiration: 604800  # 7 days for development
+  session:
+    timeout: 7200  # 2 hours for development
+
+# Cache Configuration (Development)
+cache:
+  default_ttl: 60  # Shorter TTL for development
+  max_size: 100
+
+# Monitoring Configuration (Development)
+monitoring:
+  health_check:
+    interval: 10000  # More frequent checks in development
+  metrics:
+    export:
+      prometheus: true
+      jmx: true  # Enable JMX for development debugging
+
+# Development-specific endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"  # Expose all endpoints in development
+  endpoint:
+    health:
+      show-details: always
+    env:
+      show-values: always
+    beans:
+      show-uninitialized-fields: always
+
+# Development server configuration
+server:
+  port: 8081
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: always
+    include-exception: true
+
+# Development-specific external service endpoints
+external:
+  services:
+    auth_service: "http://localhost:8080"
+    notification_service: "http://localhost:8082"
+    billing_service: "http://localhost:8083"
+    elasticsearch: "http://localhost:9200"
+    redis: "localhost:6379"
+
+# Development-specific compliance settings
+compliance:
+  audit:
+    enabled: true
+    retention_days: 30  # Shorter retention for development
+  gdpr:
+    data_retention_days: 30

@@ -1,0 +1,222 @@
+# IAM Provider Configuration
+# This file demonstrates how to easily switch between different IAM providers
+# by changing a single configuration property.
+
+# =============================================
+# IAM PROVIDER SELECTION
+# =============================================
+
+# Active IAM provider (keycloak, auth0, okta, etc.)
+# Change this single property to switch IAM providers
+iam:
+  provider: keycloak  # Options: keycloak, auth0, okta, custom
+
+# =============================================
+# KEYCLOAK CONFIGURATION
+# =============================================
+
+# Keycloak settings (used when iam.provider=keycloak)
+keycloak:
+  auth-server-url: http://localhost:8080
+  realm: saas-starter-kit
+  resource: saas-backend
+  credentials:
+    secret: your-backend-secret-here
+  notification:
+    client-id: notification-client
+    redirect-uri: http://localhost:3000/callback
+    lifespan: 3600
+
+# =============================================
+# AUTH0 CONFIGURATION
+# =============================================
+
+# Auth0 settings (used when iam.provider=auth0)
+auth0:
+  domain: your-tenant.auth0.com
+  client-id: your-client-id
+  client-secret: your-client-secret
+  audience: https://your-api.com
+  management-api:
+    audience: https://your-tenant.auth0.com/api/v2/
+    scope: read:users update:users delete:users read:user_idp_tokens
+
+# =============================================
+# OKTA CONFIGURATION
+# =============================================
+
+# Okta settings (used when iam.provider=okta)
+okta:
+  domain: your-tenant.okta.com
+  client-id: your-client-id
+  client-secret: your-client-secret
+  authorization-server-id: default
+  scopes:
+    - openid
+    - profile
+    - email
+    - okta.users.read
+    - okta.users.manage
+
+# =============================================
+# CUSTOM IAM PROVIDER CONFIGURATION
+# =============================================
+
+# Custom IAM provider settings (used when iam.provider=custom)
+custom-iam:
+  base-url: https://your-custom-iam.com
+  client-id: your-client-id
+  client-secret: your-client-secret
+  endpoints:
+    token: /oauth/token
+    userinfo: /oauth/userinfo
+    users: /api/users
+    roles: /api/roles
+
+# =============================================
+# IAM PROVIDER FEATURES
+# =============================================
+
+# Enable/disable specific IAM features
+iam:
+  features:
+    # User management
+    user-creation: true
+    user-update: true
+    user-deletion: true
+    user-search: true
+    
+    # Role management
+    role-creation: true
+    role-assignment: true
+    role-removal: true
+    
+    # Authentication
+    password-reset: true
+    email-verification: true
+    mfa-support: true
+    
+    # Multi-tenancy
+    multi-tenant: true
+    realm-switching: false  # Most providers don't support this
+    
+    # Advanced features
+    user-attributes: true
+    custom-claims: true
+    social-login: true
+
+# =============================================
+# LOGGING AND MONITORING
+# =============================================
+
+# IAM provider logging configuration
+logging:
+  level:
+    com.saasstarterkit.user.service.adapters: DEBUG
+    com.saasstarterkit.user.service.interfaces: DEBUG
+  
+  # Log IAM operations for debugging
+  iam:
+    log-operations: true
+    log-user-data: false  # Set to false in production for security
+    log-authentication: true
+    log-role-changes: true
+
+# =============================================
+# SECURITY SETTINGS
+# =============================================
+
+# Security configuration for IAM integration
+security:
+  iam:
+    # Token validation settings
+    token-validation:
+      enabled: true
+      cache-ttl: 300  # 5 minutes
+    
+    # Rate limiting for IAM operations
+    rate-limiting:
+      enabled: true
+      max-requests-per-minute: 100
+    
+    # Audit logging
+    audit-logging:
+      enabled: true
+      log-failed-operations: true
+      log-successful-operations: false
+
+# =============================================
+# MIGRATION SETTINGS
+# =============================================
+
+# Settings for migrating from old user management to IAM
+migration:
+  enabled: false
+  batch-size: 100
+  validate-iam-connectivity: true
+  
+  # Data mapping for migration
+  field-mapping:
+    username: keycloakUserId
+    password: null  # Passwords are not migrated to IAM
+    email: email
+    firstName: firstName
+    lastName: lastName
+    enabled: null  # User state is managed by IAM
+    roles: null    # Roles are managed by IAM
+
+# =============================================
+# EXAMPLES OF PROVIDER SWITCHING
+# =============================================
+
+# To switch to Auth0:
+# 1. Change iam.provider to "auth0"
+# 2. Configure auth0.* properties
+# 3. Restart the application
+
+# To switch to Okta:
+# 1. Change iam.provider to "okta"
+# 2. Configure okta.* properties
+# 3. Restart the application
+
+# To switch back to Keycloak:
+# 1. Change iam.provider to "keycloak"
+# 2. Ensure keycloak.* properties are configured
+# 3. Restart the application
+
+# =============================================
+# ENVIRONMENT-SPECIFIC OVERRIDES
+# =============================================
+
+# Development environment
+---
+spring:
+  profiles: dev
+iam:
+  provider: keycloak
+logging:
+  level:
+    com.saasstarterkit.user.service.adapters: DEBUG
+
+# Production environment
+---
+spring:
+  profiles: prod
+iam:
+  provider: keycloak  # or auth0, okta based on your choice
+logging:
+  level:
+    com.saasstarterkit.user.service.adapters: INFO
+  iam:
+    log-user-data: false
+    log-operations: false
+
+# Testing environment
+---
+spring:
+  profiles: test
+iam:
+  provider: keycloak
+logging:
+  level:
+    com.saasstarterkit.user.service.adapters: DEBUG

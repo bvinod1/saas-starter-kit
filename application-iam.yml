@@ -1,0 +1,60 @@
+iam:
+  provider: keycloak # Options: keycloak, auth0, okta, custom
+
+keycloak:
+  auth-server-url: http://localhost:8080
+  realm: saas-starter-kit
+  admin-username: admin
+  admin-password: admin
+  client-id: admin-cli
+  client-secret: your-client-secret
+
+auth0:
+  domain: your-tenant.auth0.com
+  client-id: your-client-id
+  client-secret: your-client-secret
+  audience: your-api-audience
+
+okta:
+  domain: your-tenant.okta.com
+  client-id: your-client-id
+  client-secret: your-client-secret
+  audience: your-api-audience
+
+custom-iam:
+  base-url: https://your-custom-iam.com
+  api-key: your-api-key
+  timeout: 30000
+
+iam:
+  features:
+    user-creation: true
+    user-update: true
+    user-deletion: true
+    role-management: true
+    password-management: true
+    email-actions: true
+    multi-tenancy: true
+
+logging:
+  level:
+    com.saasstarterkit.user.service.adapters: DEBUG
+  iam:
+    log-operations: true
+    log-user-data: false
+
+security:
+  iam:
+    token-validation:
+      enabled: true
+      timeout: 5000
+
+migration:
+  enabled: false
+  batch-size: 100
+  field-mapping:
+    username: keycloakUserId
+    password: null
+    email: email
+    firstName: firstName
+    lastName: lastName

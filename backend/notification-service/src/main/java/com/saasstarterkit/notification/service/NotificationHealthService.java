@@ -1,83 +1,39 @@
 package com.saasstarterkit.notification.service;
 
 import com.saasstarterkit.notification.entity.Notification;
-import com.saasstarterkit.notification.service.channel.NotificationChannelProvider;
+import com.saasstarterkit.notification.repository.NotificationRepository;
+import com.saasstarterkit.notification.repository.NotificationTemplateRepository;
+import com.saasstarterkit.notification.repository.UserNotificationPreferencesRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.actuator.health.Health;
-import org.springframework.boot.actuator.health.HealthIndicator;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Health check service for notification system
- * Monitors the health of all channel providers and overall system status
+ * Monitors the health of notification repositories and overall system status
  */
 @Service
-public class NotificationHealthService implements HealthIndicator {
+public class NotificationHealthService {
     
     private static final Logger logger = LoggerFactory.getLogger(NotificationHealthService.class);
     
     @Autowired
-    private ChannelProviderRegistry channelProviderRegistry;
-    
-    @Autowired
     private NotificationRepository notificationRepository;
     
+    @Autowired
+    private NotificationTemplateRepository templateRepository;
+    
+    @Autowired
+    private UserNotificationPreferencesRepository preferencesRepository;
+    
     // Health check configuration
-    private static final int HEALTH_CHECK_TIMEOUT_SECONDS = 10;
     private static final int MAX_FAILED_NOTIFICATIONS = 100;
     private static final int MAX_PENDING_NOTIFICATIONS = 1000;
-    
-    // =============================================
-    // HEALTH INDICATOR IMPLEMENTATION
-    // =============================================
-    
-    @Override
-    public Health health() {
-        try {
-            Map<String, Object> healthDetails = new HashMap<>();
-            
-            // Check channel providers health
-            Map<Notification.NotificationChannel, Boolean> providerHealth = 
-                channelProviderRegistry.getProviderHealthStatus();
-            healthDetails.put("channel_providers", providerHealth);
-            
-            // Check notification queue health
-            Map<String, Object> queueHealth = checkNotificationQueueHealth();
-            healthDetails.put("notification_queue", queueHealth);
-            
-            // Check database connectivity
-            Map<String, Object> databaseHealth = checkDatabaseHealth();
-            healthDetails.put("database", databaseHealth);
-            
-            // Check overall system health
-            boolean isHealthy = isSystemHealthy(providerHealth, queueHealth, databaseHealth);
-            
-            if (isHealthy) {
-                return Health.up()
-                        .withDetails(healthDetails)
-                        .build();
-            } else {
-                return Health.down()
-                        .withDetails(healthDetails)
-                        .build();
-            }
-            
-        } catch (Exception e) {
-            logger.error("Health check failed", e);
-            return Health.down()
-                    .withException(e)
-                    .build();
-        }
-    }
     
     // =============================================
     // PUBLIC METHODS
@@ -90,17 +46,14 @@ public class NotificationHealthService implements HealthIndicator {
         Map<String, Object> healthStatus = new HashMap<>();
         
         try {
-            // Channel providers health
-            healthStatus.put("channel_providers", getChannelProvidersHealth());
+            // Repository health
+            healthStatus.put("repositories", getRepositoriesHealth());
             
             // Notification queue health
             healthStatus.put("notification_queue", getNotificationQueueHealth());
             
             // Database health
             healthStatus.put("database", getDatabaseHealth());
-            
-            // System metrics
-            healthStatus.put("system_metrics", getSystemMetrics());
             
             // Overall status
             healthStatus.put("overall_status", determineOverallStatus(healthStatus));
@@ -120,13 +73,11 @@ public class NotificationHealthService implements HealthIndicator {
      */
     public boolean isSystemHealthy() {
         try {
-            Map<Notification.NotificationChannel, Boolean> providerHealth = 
-                channelProviderRegistry.getProviderHealthStatus();
+            Map<String, Object> repositoriesHealth = getRepositoriesHealth();
+            Map<String, Object> queueHealth = getNotificationQueueHealth();
+            Map<String, Object> databaseHealth = getDatabaseHealth();
             
-            Map<String, Object> queueHealth = checkNotificationQueueHealth();
-            Map<String, Object> databaseHealth = checkDatabaseHealth();
-            
-            return isSystemHealthy(providerHealth, queueHealth, databaseHealth);
+            return isSystemHealthy(repositoriesHealth, queueHealth, databaseHealth);
             
         } catch (Exception e) {
             logger.error("System health check failed", e);
@@ -135,51 +86,32 @@ public class NotificationHealthService implements HealthIndicator {
     }
     
     /**
-     * Get health status for specific channel
+     * Get simple health status
      */
-    public Map<String, Object> getChannelHealth(Notification.NotificationChannel channel) {
-        Map<String, Object> channelHealth = new HashMap<>();
+    public Map<String, Object> getHealthStatus() {
+        Map<String, Object> health = new HashMap<>();
         
         try {
-            NotificationChannelProvider provider = channelProviderRegistry.getProvider(channel);
+            boolean healthy = isSystemHealthy();
+            health.put("status", healthy ? "UP" : "DOWN");
+            health.put("healthy", healthy);
+            health.put("timestamp", LocalDateTime.now().toString());
             
-            if (provider == null) {
-                channelHealth.put("status", "NOT_AVAILABLE");
-                channelHealth.put("message", "Channel provider not found");
-                return channelHealth;
+            if (healthy) {
+                health.put("message", "Notification service is healthy");
+            } else {
+                health.put("message", "Notification service has issues");
             }
             
-            boolean isHealthy = provider.isHealthy();
-            channelHealth.put("status", isHealthy ? "HEALTHY" : "UNHEALTHY");
-            channelHealth.put("healthy", isHealthy);
-            channelHealth.put("provider_class", provider.getClass().getSimpleName());
-            channelHealth.put("configuration", provider.getConfiguration());
-            channelHealth.put("metadata", provider.getMetadata());
-            channelHealth.put("estimated_delivery_time_ms", provider.getEstimatedDeliveryTimeMs());
-            
         } catch (Exception e) {
-            logger.error("Channel health check failed for: {}", channel, e);
-            channelHealth.put("status", "ERROR");
-            channelHealth.put("error", e.getMessage());
+            logger.error("Health check failed", e);
+            health.put("status", "DOWN");
+            health.put("healthy", false);
+            health.put("error", e.getMessage());
+            health.put("timestamp", LocalDateTime.now().toString());
         }
         
-        return channelHealth;
-    }
-    
-    /**
-     * Perform health check for all channels
-     */
-    public Map<Notification.NotificationChannel, Map<String, Object>> checkAllChannelsHealth() {
-        Map<Notification.NotificationChannel, Map<String, Object>> channelsHealth = new HashMap<>();
-        
-        List<Notification.NotificationChannel> supportedChannels = 
-            channelProviderRegistry.getSupportedChannels();
-        
-        for (Notification.NotificationChannel channel : supportedChannels) {
-            channelsHealth.put(channel, getChannelHealth(channel));
-        }
-        
-        return channelsHealth;
+        return health;
     }
     
     // =============================================
@@ -187,16 +119,49 @@ public class NotificationHealthService implements HealthIndicator {
     // =============================================
     
     /**
+     * Check repositories health
+     */
+    private Map<String, Object> getRepositoriesHealth() {
+        Map<String, Object> repositoriesHealth = new HashMap<>();
+        
+        try {
+            // Check notification repository
+            long notificationCount = notificationRepository.count();
+            repositoriesHealth.put("notification_repository", true);
+            repositoriesHealth.put("notification_count", notificationCount);
+            
+            // Check template repository
+            long templateCount = templateRepository.count();
+            repositoriesHealth.put("template_repository", true);
+            repositoriesHealth.put("template_count", templateCount);
+            
+            // Check preferences repository
+            long preferencesCount = preferencesRepository.count();
+            repositoriesHealth.put("preferences_repository", true);
+            repositoriesHealth.put("preferences_count", preferencesCount);
+            
+            repositoriesHealth.put("overall_healthy", true);
+            
+        } catch (Exception e) {
+            logger.error("Repository health check failed", e);
+            repositoriesHealth.put("overall_healthy", false);
+            repositoriesHealth.put("error", e.getMessage());
+        }
+        
+        return repositoriesHealth;
+    }
+    
+    /**
      * Check notification queue health
      */
-    private Map<String, Object> checkNotificationQueueHealth() {
+    private Map<String, Object> getNotificationQueueHealth() {
         Map<String, Object> queueHealth = new HashMap<>();
         
         try {
             // Count notifications by status
-            long pendingCount = notificationRepository.countByStatus(Notification.NotificationStatus.PENDING);
-            long failedCount = notificationRepository.countByStatus(Notification.NotificationStatus.FAILED);
-            long sentCount = notificationRepository.countByStatus(Notification.NotificationStatus.SENT);
+            long pendingCount = notificationRepository.findByStatus("PENDING").size();
+            long failedCount = notificationRepository.findByStatus("FAILED").size();
+            long sentCount = notificationRepository.findByStatus("SENT").size();
             
             queueHealth.put("pending_count", pendingCount);
             queueHealth.put("failed_count", failedCount);
@@ -230,7 +195,7 @@ public class NotificationHealthService implements HealthIndicator {
     /**
      * Check database health
      */
-    private Map<String, Object> checkDatabaseHealth() {
+    private Map<String, Object> getDatabaseHealth() {
         Map<String, Object> databaseHealth = new HashMap<>();
         
         try {
@@ -261,12 +226,12 @@ public class NotificationHealthService implements HealthIndicator {
     /**
      * Check if system is overall healthy
      */
-    private boolean isSystemHealthy(Map<Notification.NotificationChannel, Boolean> providerHealth,
+    private boolean isSystemHealthy(Map<String, Object> repositoriesHealth,
                                    Map<String, Object> queueHealth,
                                    Map<String, Object> databaseHealth) {
         
-        // Check if at least one provider is healthy
-        boolean hasHealthyProviders = providerHealth.values().stream().anyMatch(Boolean::booleanValue);
+        // Check repositories health
+        boolean isRepositoriesHealthy = (Boolean) repositoriesHealth.getOrDefault("overall_healthy", false);
         
         // Check queue health
         boolean isQueueHealthy = (Boolean) queueHealth.getOrDefault("overall_healthy", false);
@@ -274,91 +239,7 @@ public class NotificationHealthService implements HealthIndicator {
         // Check database health
         boolean isDatabaseHealthy = (Boolean) databaseHealth.getOrDefault("healthy", false);
         
-        return hasHealthyProviders && isQueueHealthy && isDatabaseHealthy;
-    }
-    
-    /**
-     * Get channel providers health
-     */
-    private Map<String, Object> getChannelProvidersHealth() {
-        Map<String, Object> providersHealth = new HashMap<>();
-        
-        try {
-            Map<Notification.NotificationChannel, Boolean> healthStatus = 
-                channelProviderRegistry.getProviderHealthStatus();
-            
-            providersHealth.put("status", healthStatus);
-            
-            long healthyCount = healthStatus.values().stream().filter(Boolean::booleanValue).count();
-            long totalCount = healthStatus.size();
-            
-            providersHealth.put("healthy_count", healthyCount);
-            providersHealth.put("total_count", totalCount);
-            providersHealth.put("overall_healthy", healthyCount > 0);
-            
-            if (healthyCount == 0) {
-                providersHealth.put("warning", "No healthy channel providers available");
-            }
-            
-        } catch (Exception e) {
-            logger.error("Failed to get channel providers health", e);
-            providersHealth.put("error", e.getMessage());
-            providersHealth.put("overall_healthy", false);
-        }
-        
-        return providersHealth;
-    }
-    
-    /**
-     * Get notification queue health
-     */
-    private Map<String, Object> getNotificationQueueHealth() {
-        return checkNotificationQueueHealth();
-    }
-    
-    /**
-     * Get database health
-     */
-    private Map<String, Object> getDatabaseHealth() {
-        return checkDatabaseHealth();
-    }
-    
-    /**
-     * Get system metrics
-     */
-    private Map<String, Object> getSystemMetrics() {
-        Map<String, Object> metrics = new HashMap<>();
-        
-        try {
-            // Get provider configurations
-            Map<Notification.NotificationChannel, NotificationChannelProvider.ChannelConfiguration> configs = 
-                channelProviderRegistry.getAllConfigurations();
-            
-            metrics.put("total_providers", configs.size());
-            metrics.put("enabled_providers", configs.values().stream()
-                    .filter(NotificationChannelProvider.ChannelConfiguration::isEnabled)
-                    .count());
-            
-            // Get provider metadata
-            Map<Notification.NotificationChannel, NotificationChannelProvider.ChannelMetadata> metadata = 
-                channelProviderRegistry.getAllMetadata();
-            
-            metrics.put("supported_formats", metadata.values().stream()
-                    .map(NotificationChannelProvider.ChannelMetadata::getSupportedFormats)
-                    .distinct()
-                    .toList());
-            
-            metrics.put("total_regions", metadata.values().stream()
-                    .map(NotificationChannelProvider.ChannelMetadata::getRegion)
-                    .distinct()
-                    .count());
-            
-        } catch (Exception e) {
-            logger.error("Failed to get system metrics", e);
-            metrics.put("error", e.getMessage());
-        }
-        
-        return metrics;
+        return isRepositoriesHealthy && isQueueHealthy && isDatabaseHealthy;
     }
     
     /**
@@ -366,9 +247,9 @@ public class NotificationHealthService implements HealthIndicator {
      */
     private String determineOverallStatus(Map<String, Object> healthStatus) {
         try {
-            // Check channel providers
-            Map<String, Object> providersHealth = (Map<String, Object>) healthStatus.get("channel_providers");
-            boolean providersHealthy = (Boolean) providersHealth.getOrDefault("overall_healthy", false);
+            // Check repositories
+            Map<String, Object> repositoriesHealth = (Map<String, Object>) healthStatus.get("repositories");
+            boolean repositoriesHealthy = (Boolean) repositoriesHealth.getOrDefault("overall_healthy", false);
             
             // Check queue
             Map<String, Object> queueHealth = (Map<String, Object>) healthStatus.get("notification_queue");
@@ -378,9 +259,9 @@ public class NotificationHealthService implements HealthIndicator {
             Map<String, Object> databaseHealth = (Map<String, Object>) healthStatus.get("database");
             boolean databaseHealthy = (Boolean) databaseHealth.getOrDefault("healthy", false);
             
-            if (providersHealthy && queueHealthy && databaseHealthy) {
+            if (repositoriesHealthy && queueHealthy && databaseHealthy) {
                 return "HEALTHY";
-            } else if (providersHealthy || queueHealthy || databaseHealthy) {
+            } else if (repositoriesHealthy || queueHealthy || databaseHealthy) {
                 return "DEGRADED";
             } else {
                 return "UNHEALTHY";

@@ -15,6 +15,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -55,8 +56,8 @@ public class WebhookChannelProvider implements NotificationChannelProvider {
     // =============================================
     
     @Override
-    public Notification.NotificationChannel getChannelType() {
-        return Notification.NotificationChannel.WEBHOOK;
+    public com.saasstarterkit.notification.domain.enums.NotificationChannel getChannelType() {
+        return com.saasstarterkit.notification.domain.enums.NotificationChannel.WEBHOOK;
     }
     
     @Override
@@ -281,21 +282,21 @@ public class WebhookChannelProvider implements NotificationChannelProvider {
      */
     private Map<String, Object> buildWebhookPayload(Notification notification, 
                                                    UserNotificationPreferences preferences) {
-        return Map.of(
-            "notificationId", notification.getId().toString(),
-            "type", "WEBHOOK",
-            "title", notification.getTitle() != null ? notification.getTitle() : "Notification",
-            "message", notification.getMessage(),
-            "priority", notification.getPriority().toString(),
-            "category", notification.getSourceEvent() != null ? notification.getSourceEvent() : "general",
-            "timestamp", LocalDateTime.now().toString(),
-            "userId", notification.getUserId(),
-            "tenantId", notification.getTenantId(),
-            "organizationId", notification.getOrganizationId() != null ? notification.getOrganizationId() : "",
-            "data", notification.getData() != null ? notification.getData() : "",
-            "sourceEvent", notification.getSourceEvent() != null ? notification.getSourceEvent() : "",
-            "correlationId", notification.getCorrelationId() != null ? notification.getCorrelationId() : ""
-        );
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("notificationId", notification.getId().toString());
+        payload.put("type", "WEBHOOK");
+        payload.put("title", notification.getTitle() != null ? notification.getTitle() : "Notification");
+        payload.put("message", notification.getMessage());
+        payload.put("priority", notification.getPriority().toString());
+        payload.put("category", notification.getSourceEvent() != null ? notification.getSourceEvent() : "general");
+        payload.put("timestamp", LocalDateTime.now().toString());
+        payload.put("userId", notification.getUserId());
+        payload.put("tenantId", notification.getTenantId());
+        payload.put("organizationId", notification.getOrganizationId() != null ? notification.getOrganizationId() : "");
+        payload.put("data", notification.getData() != null ? notification.getData() : "");
+        payload.put("sourceEvent", notification.getSourceEvent() != null ? notification.getSourceEvent() : "");
+        payload.put("correlationId", notification.getCorrelationId() != null ? notification.getCorrelationId() : "");
+        return payload;
     }
     
     /**

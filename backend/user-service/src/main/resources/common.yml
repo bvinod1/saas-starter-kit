@@ -1,0 +1,116 @@
+# Common Properties - Shared across all environments
+# This file is committed to version control
+
+# Application Information
+app:
+  name: "SaaS Starter Kit - User Service"
+  version: "1.0.0"
+  description: "Multi-tenant user management service"
+
+# Logging Configuration
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  level:
+    root: INFO
+    com.saasstarterkit: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+# OpenTelemetry Configuration
+opentelemetry:
+  enabled: true
+  sampling:
+    probability: 1.0
+  propagation:
+    type: w3c
+  exporter:
+    endpoint: "http://localhost:4317"
+    timeout: 30000
+
+# Feature Flags
+features:
+  multi_tenancy: true
+  advanced_logging: true
+  opentelemetry: true
+  configuration_management: true
+  compliance_tracking: true
+
+# Security Configuration
+security:
+  jwt:
+    expiration: 3600
+    refresh_expiration: 86400
+  password:
+    min_length: 8
+    require_special_chars: true
+    require_numbers: true
+    require_uppercase: true
+  session:
+    timeout: 3600
+    max_concurrent: 5
+
+# Database Configuration
+database:
+  connection_pool:
+    initial_size: 5
+    max_size: 20
+    min_idle: 5
+    max_lifetime: 1800000
+  jpa:
+    show_sql: false
+    hibernate:
+      ddl_auto: validate
+      naming:
+        physical_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+
+# Cache Configuration
+cache:
+  default_ttl: 300
+  max_size: 1000
+  eviction_policy: LRU
+
+# Notification Configuration
+notifications:
+  email:
+    enabled: true
+    template_path: "/templates/email"
+  sms:
+    enabled: false
+  push:
+    enabled: false
+
+# Billing Configuration
+billing:
+  currency: USD
+  tax_rate: 0.0
+  invoice_prefix: "INV"
+  payment_terms: 30
+
+# Compliance Configuration
+compliance:
+  gdpr:
+    enabled: true
+    data_retention_days: 2555
+  hipaa:
+    enabled: false
+    phi_encryption: false
+  audit:
+    enabled: true
+    retention_days: 3650
+
+# Monitoring Configuration
+monitoring:
+  health_check:
+    enabled: true
+    interval: 30000
+  metrics:
+    enabled: true
+    export:
+      prometheus: true
+      jmx: false
+  tracing:
+    enabled: true
+    sampling_rate: 1.0

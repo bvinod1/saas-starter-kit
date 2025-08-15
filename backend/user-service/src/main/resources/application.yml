@@ -1,69 +1,217 @@
-server:
-  port: 8081
+# Main Application Configuration
+# This file contains Spring Boot specific configurations
+# Environment-specific overrides are in application-{profile}.yml files
 
 spring:
   application:
-    name: user-service
+    name: "SaaS Starter Kit - User Service"
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   
+  # Database configuration will be overridden by profile-specific files
   datasource:
-    url: jdbc:postgresql://localhost:5432/saas_starter_kit
-    username: saas_user
-    password: saas_password
     driver-class-name: org.postgresql.Driver
   
+  # JPA configuration
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl_auto: validate
     show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
-    packages-to-scan: com.saasstarterkit.user.entity
+        format_sql: false
+        use_sql_comments: false
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        batch_versioned_data: true
   
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      timeout: 2000ms
+  # Security configuration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:http://localhost:8080}
+  
+  # Jackson configuration
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+      write-date-timestamps-as-nanoseconds: false
+    deserialization:
+      fail-on-unknown-properties: false
+    time-zone: UTC
 
-# JWT Configuration
-jwt:
-  secret: ${JWT_SECRET:DUO9HD24VrhZWLnypYn/gKpcihfBBkKl7wfaNKUPPOs=}
-  expiration: 86400000 # 24 hours in milliseconds
-
-# Application Configuration
-app:
-  cors:
-    allowed-origins: 
-      - "http://localhost:3000"
-      - "http://localhost:3001"
-    allowed-methods:
-      - GET
-      - POST
-      - PUT
-      - DELETE
-      - OPTIONS
-    allowed-headers:
-      - "*"
-    allow-credentials: true
+# Server configuration
+server:
+  port: ${SERVER_PORT:8081}
+  servlet:
+    context-path: /
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+    min-response-size: 1024
 
 # Management endpoints
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,metrics,prometheus,trace,loggers
+      base-path: /actuator
   endpoint:
     health:
-      show-details: always
+      show-details: when-authorized
+      show-components: always
+    info:
+      enabled: true
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+      environment: ${spring.profiles.active}
+      service: user-service
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        http.client.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+        http.client.requests: 0.5, 0.95, 0.99
+  tracing:
+    sampling:
+      probability: 1.0
+    propagation:
+      type: w3c
+  web:
+    request:
+      logging: if-not-matches
+      logging-level: DEBUG
 
-# Logging
+# Logging configuration
 logging:
+  config: classpath:logback-spring.xml
   level:
-    com.saasstarterkit.user: DEBUG
-    org.springframework.security: DEBUG
+    root: INFO
+    com.saasstarterkit: DEBUG
+    org.springframework.security: INFO
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n" 
+
+# OpenTelemetry configuration
+opentelemetry:
+  enabled: true
+  sampling:
+    probability: 1.0
+  propagation:
+    type: w3c
+  exporter:
+    endpoint: ${OTEL_EXPORTER_ENDPOINT:http://localhost:4317}
+    timeout: ${OTEL_EXPORTER_TIMEOUT:30000}
+
+# Feature flags
+features:
+  multi_tenancy: true
+  advanced_logging: true
+  opentelemetry: true
+  configuration_management: true
+  compliance_tracking: true
+  debug_mode: false
+
+# Security configuration
+security:
+  jwt:
+    expiration: ${JWT_EXPIRATION:3600}
+    refresh_expiration: ${JWT_REFRESH_EXPIRATION:86400}
+  password:
+    min_length: ${PASSWORD_MIN_LENGTH:8}
+    require_special_chars: ${PASSWORD_REQUIRE_SPECIAL_CHARS:true}
+    require_numbers: ${PASSWORD_REQUIRE_NUMBERS:true}
+    require_uppercase: ${PASSWORD_REQUIRE_UPPERCASE:true}
+  session:
+    timeout: ${SESSION_TIMEOUT:3600}
+    max_concurrent: ${SESSION_MAX_CONCURRENT:5}
+
+# Database connection pool
+database:
+  connection_pool:
+    initial_size: ${DB_INITIAL_SIZE:5}
+    max_size: ${DB_MAX_SIZE:20}
+    min_idle: ${DB_MIN_IDLE:5}
+    max_lifetime: ${DB_MAX_LIFETIME:1800000}
+
+# Cache configuration
+cache:
+  default_ttl: ${CACHE_DEFAULT_TTL:300}
+  max_size: ${CACHE_MAX_SIZE:1000}
+  eviction_policy: ${CACHE_EVICTION_POLICY:LRU}
+
+# Notification configuration
+notifications:
+  email:
+    enabled: ${EMAIL_ENABLED:true}
+    template_path: ${EMAIL_TEMPLATE_PATH:/templates/email}
+  sms:
+    enabled: ${SMS_ENABLED:false}
+  push:
+    enabled: ${PUSH_ENABLED:false}
+
+# Billing configuration
+billing:
+  currency: ${BILLING_CURRENCY:USD}
+  tax_rate: ${BILLING_TAX_RATE:0.0}
+  invoice_prefix: ${BILLING_INVOICE_PREFIX:INV}
+  payment_terms: ${BILLING_PAYMENT_TERMS:30}
+
+# Compliance configuration
+compliance:
+  gdpr:
+    enabled: ${GDPR_ENABLED:true}
+    data_retention_days: ${GDPR_RETENTION_DAYS:2555}
+  hipaa:
+    enabled: ${HIPAA_ENABLED:false}
+    phi_encryption: ${HIPAA_PHI_ENCRYPTION:false}
+  audit:
+    enabled: ${AUDIT_ENABLED:true}
+    retention_days: ${AUDIT_RETENTION_DAYS:3650}
+
+# Monitoring configuration
+monitoring:
+  health_check:
+    enabled: ${HEALTH_CHECK_ENABLED:true}
+    interval: ${HEALTH_CHECK_INTERVAL:30000}
+  metrics:
+    enabled: ${METRICS_ENABLED:true}
+    export:
+      prometheus: ${PROMETHEUS_EXPORT:true}
+      jmx: ${JMX_EXPORT:false}
+  tracing:
+    enabled: ${TRACING_ENABLED:true}
+    sampling_rate: ${TRACING_SAMPLING_RATE:1.0}
+
+# External services configuration
+external:
+  services:
+    auth_service: ${AUTH_SERVICE_URL:http://localhost:8080}
+    notification_service: ${NOTIFICATION_SERVICE_URL:http://localhost:8082}
+    billing_service: ${BILLING_SERVICE_URL:http://localhost:8083}
+    elasticsearch: ${ELASTICSEARCH_URL:http://localhost:9200}
+    redis: ${REDIS_HOST:localhost}:${REDIS_PORT:6379}
+
+# Secret management configuration
+secrets:
+  manager:
+    enabled: ${SECRETS_MANAGER_ENABLED:false}
+    type: ${SECRETS_MANAGER_TYPE:local}
+    endpoint: ${SECRETS_MANAGER_ENDPOINT:}
+    namespace: ${SECRETS_MANAGER_NAMESPACE:saas-starter-kit}
+    refresh_interval: ${SECRETS_REFRESH_INTERVAL:300000} 

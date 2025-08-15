@@ -72,7 +72,7 @@ public class ChannelProviderFactory {
     /**
      * Get or create provider for a specific channel
      */
-    public NotificationChannelProvider getOrCreateProvider(Notification.NotificationChannel channel) {
+    public NotificationChannelProvider getOrCreateProvider(com.saasstarterkit.notification.domain.enums.NotificationChannel channel) {
         String providerType = getProviderTypeForChannel(channel);
         return createProvider(providerType);
     }
@@ -280,13 +280,26 @@ public class ChannelProviderFactory {
     /**
      * Get provider type for a channel
      */
-    private String getProviderTypeForChannel(Notification.NotificationChannel channel) {
+    private String getProviderTypeForChannel(com.saasstarterkit.notification.domain.enums.NotificationChannel channel) {
         return switch (channel) {
             case EMAIL -> "email";
             case SMS -> "sms";
             case PUSH -> "push";
             case IN_APP -> "in-app";
             case WEBHOOK -> "webhook";
+            case SLACK -> "slack";
+            case TEAMS -> "teams";
+            case DISCORD -> "discord";
+            case WHATSAPP -> "whatsapp";
+            case TELEGRAM -> "telegram";
+            case VOICE -> "voice";
+            case FAX -> "fax";
+            case LETTER -> "letter";
+            case MOBILE_APP -> "mobile-app";
+            case DESKTOP_APP -> "desktop-app";
+            case BROWSER -> "browser";
+            case SOCIAL_MEDIA -> "social-media";
+            case CUSTOM -> "custom";
         };
     }
     

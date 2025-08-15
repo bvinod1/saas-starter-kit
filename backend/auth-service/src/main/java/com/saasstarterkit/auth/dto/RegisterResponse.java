@@ -68,6 +68,9 @@ public class RegisterResponse {
         private String firstName;
         private String lastName;
         private String token;
+        private String organizationClientId;
+        private String refreshToken;
+        private Long expiresIn;
 
         public UserData() {}
 
@@ -118,6 +121,30 @@ public class RegisterResponse {
 
         public void setToken(String token) {
             this.token = token;
+        }
+
+        public String getOrganizationClientId() {
+            return organizationClientId;
+        }
+
+        public void setOrganizationClientId(String organizationClientId) {
+            this.organizationClientId = organizationClientId;
+        }
+
+        public String getRefreshToken() {
+            return refreshToken;
+        }
+
+        public void setRefreshToken(String refreshToken) {
+            this.refreshToken = refreshToken;
+        }
+
+        public Long getExpiresIn() {
+            return expiresIn;
+        }
+
+        public void setExpiresIn(Long expiresIn) {
+            this.expiresIn = expiresIn;
         }
     }
 } 

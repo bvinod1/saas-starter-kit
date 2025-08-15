@@ -1,0 +1,561 @@
+_format_version: "3.0"
+
+# =============================================================================
+# Kong API Gateway - Organizational Management Integration
+# =============================================================================
+# This configuration extends the multi-tenant setup with:
+# - Organizational policy enforcement
+# - Compliance monitoring
+# - Governance and audit logging
+# - Dynamic rate limiting based on organization tier
+# - Policy-based access control
+# =============================================================================
+
+# =============================================================================
+# ORGANIZATIONAL MANAGEMENT SERVICE
+# =============================================================================
+
+services:
+  # Organizational Management Service
+  - name: organisation-service
+    url: http://host.docker.internal:8086
+    tags: ["organizational-management", "core-service"]
+    routes:
+      - name: organizational-management-routes
+        paths:
+          - /api/organizational-management
+        strip_path: true
+        tags: ["organizational-management", "api-routes"]
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          headers: ["Content-Type", "Authorization", "X-Tenant-ID", "X-Organization-ID"]
+          exposed_headers: ["X-Total-Count", "X-Organization-ID", "X-Policy-Version"]
+          credentials: true
+          max_age: 3600
+        tags: ["organizational-management", "cors"]
+      - name: rate-limiting
+        config:
+          minute: 200
+          hour: 2000
+          day: 20000
+          policy: local
+          fault_tolerant: true
+        tags: ["organizational-management", "rate-limiting"]
+      - name: jwt
+        config:
+          secret: "organizational-management-jwt-secret-key"
+          key_claim_name: "kid"
+          algorithm: "HS256"
+          claims_to_verify: ["iss", "sub", "tenant", "organization"]
+        tags: ["organizational-management", "jwt"]
+
+# =============================================================================
+# ENHANCED TENANT CONFIGURATIONS WITH ORGANIZATIONAL POLICIES
+# =============================================================================
+
+  # Tenant A - Enhanced with Organizational Policies
+  - name: tenant-a-enhanced-user-service
+    url: http://host.docker.internal:8081
+    tags: ["tenant-a", "user-service", "enhanced"]
+    routes:
+      - name: tenant-a-enhanced-user-routes
+        paths:
+          - /tenant-a/api/users
+        strip_path: true
+        tags: ["tenant-a", "user-routes", "enhanced"]
+        headers:
+          X-Tenant-ID: ["tenant-a"]
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          headers: ["Content-Type", "Authorization", "X-Tenant-ID", "X-Organization-ID"]
+          exposed_headers: ["X-Total-Count", "X-Tenant-ID", "X-Organization-ID"]
+          credentials: true
+          max_age: 3600
+        tags: ["tenant-a", "cors", "enhanced"]
+      - name: rate-limiting
+        config:
+          minute: 100
+          hour: 1000
+          day: 10000
+          policy: local
+          fault_tolerant: true
+        tags: ["tenant-a", "rate-limiting", "enhanced"]
+      - name: jwt
+        config:
+          secret: "tenant-a-jwt-secret-key"
+          key_claim_name: "kid"
+          algorithm: "HS256"
+          claims_to_verify: ["iss", "sub", "tenant", "organization"]
+        tags: ["tenant-a", "jwt", "enhanced"]
+      - name: request-transformer
+        config:
+          add:
+            headers: ["X-Tenant-ID:tenant-a", "X-Organization-ID:tenant-a"]
+            json: ["tenant_id:tenant-a", "organization_id:tenant-a"]
+        tags: ["tenant-a", "request-transformer", "enhanced"]
+      - name: pre-function
+        config:
+          access:
+            - |
+              local function enforce_organizational_policies()
+                local organization_id = kong.request.get_header("X-Organization-ID")
+                if not organization_id then
+                  kong.response.exit(400, { message = "X-Organization-ID header is required" })
+                end
+                
+                -- Call organizational management service to validate policies
+                local http = require "resty.http"
+                local httpc = http.new()
+                
+                local res, err = httpc:request_uri("http://organisation-service:8086/api/organisation/organizations/" .. organization_id .. "/policies/validate", {
+                  method = "POST",
+                  headers = {
+                    ["Content-Type"] = "application/json",
+                    ["Authorization"] = kong.request.get_header("Authorization")
+                  },
+                  body = '{"resource": "user-service", "action": "access"}'
+                })
+                
+                if not res then
+                  kong.log.err("Failed to validate organizational policies: ", err)
+                  kong.response.exit(500, { message = "Policy validation failed" })
+                end
+                
+                if res.status ~= 200 then
+                  kong.response.exit(403, { message = "Access denied by organizational policy" })
+                end
+              end
+              
+              enforce_organizational_policies()
+        tags: ["tenant-a", "policy-enforcement", "enhanced"]
+
+  # Tenant B - Enhanced with Compliance Monitoring
+  - name: tenant-b-enhanced-analytics-service
+    url: http://host.docker.internal:8084
+    tags: ["tenant-b", "analytics-service", "enhanced", "compliance"]
+    routes:
+      - name: tenant-b-enhanced-analytics-routes
+        paths:
+          - /tenant-b/api/analytics
+        strip_path: true
+        tags: ["tenant-b", "analytics-routes", "enhanced"]
+        headers:
+          X-Tenant-ID: ["tenant-b"]
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          headers: ["Content-Type", "Authorization", "X-Tenant-ID", "X-Organization-ID"]
+          exposed_headers: ["X-Total-Count", "X-Tenant-ID", "X-Organization-ID"]
+          credentials: true
+          max_age: 3600
+        tags: ["tenant-b", "cors", "enhanced"]
+      - name: rate-limiting
+        config:
+          minute: 300
+          hour: 3000
+          day: 30000
+          policy: local
+          fault_tolerant: true
+        tags: ["tenant-b", "rate-limiting", "enhanced"]
+      - name: oauth2
+        config:
+          scopes: ["email", "profile", "read", "write", "analytics"]
+          enable_authorization_code: true
+          enable_client_credentials: true
+          enable_implicit_grant: true
+          enable_password_grant: true
+          token_expiration: 7200
+          refresh_token_ttl: 1209600
+        tags: ["tenant-b", "oauth2", "enhanced"]
+      - name: pre-function
+        config:
+          access:
+            - |
+              local function enforce_compliance_policies()
+                local organization_id = kong.request.get_header("X-Organization-ID")
+                if not organization_id then
+                  kong.response.exit(400, { message = "X-Organization-ID header is required" })
+                end
+                
+                -- Check compliance status
+                local http = require "resty.http"
+                local httpc = http.new()
+                
+                local res, err = httpc:request_uri("http://organisation-service:8086/api/organisation/organizations/" .. organization_id .. "/compliance/status", {
+                  method = "GET",
+                  headers = {
+                    ["Authorization"] = kong.request.get_header("Authorization")
+                  }
+                })
+                
+                if not res then
+                  kong.log.err("Failed to check compliance status: ", err)
+                  kong.response.exit(500, { message = "Compliance check failed" })
+                end
+                
+                if res.status ~= 200 then
+                  kong.response.exit(403, { message = "Organization not in compliance" })
+                end
+                
+                -- Log compliance access
+                local body = cjson.decode(res.body)
+                if body.compliance_status ~= "COMPLIANT" then
+                  kong.log.warn("Organization ", organization_id, " accessed analytics service with compliance status: ", body.compliance_status)
+                end
+              end
+              
+              enforce_compliance_policies()
+        tags: ["tenant-b", "compliance-enforcement", "enhanced"]
+
+  # Tenant C - Enterprise with Advanced Governance
+  - name: tenant-c-enterprise-service
+    url: http://host.docker.internal:8081
+    tags: ["tenant-c", "enterprise", "governance"]
+    routes:
+      - name: tenant-c-enterprise-routes
+        paths:
+          - /tenant-c/api/enterprise
+        strip_path: true
+        tags: ["tenant-c", "enterprise-routes"]
+        headers:
+          X-Tenant-ID: ["tenant-c"]
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          headers: ["Content-Type", "Authorization", "X-Tenant-ID", "X-Organization-ID", "X-Governance-Level"]
+          exposed_headers: ["X-Total-Count", "X-Tenant-ID", "X-Organization-ID", "X-Governance-Level"]
+          credentials: true
+          max_age: 3600
+        tags: ["tenant-c", "cors", "enterprise"]
+      - name: rate-limiting
+        config:
+          minute: 500
+          hour: 5000
+          day: 50000
+          policy: local
+          fault_tolerant: true
+        tags: ["tenant-c", "rate-limiting", "enterprise"]
+      - name: jwt
+        config:
+          secret: "tenant-c-jwt-secret-key"
+          key_claim_name: "kid"
+          algorithm: "HS256"
+          claims_to_verify: ["iss", "sub", "tenant", "organization", "governance_level"]
+        tags: ["tenant-c", "jwt", "enterprise"]
+      - name: request-transformer
+        config:
+          add:
+            headers: ["X-Tenant-ID:tenant-c", "X-Organization-ID:tenant-c", "X-Governance-Level:ENTERPRISE"]
+            json: ["tenant_id:tenant-c", "organization_id:tenant-c", "governance_level:ENTERPRISE"]
+        tags: ["tenant-c", "request-transformer", "enterprise"]
+      - name: pre-function
+        config:
+          access:
+            - |
+              local function enforce_enterprise_governance()
+                local organization_id = kong.request.get_header("X-Organization-ID")
+                if not organization_id then
+                  kong.response.exit(400, { message = "X-Organization-ID header is required" })
+                end
+                
+                -- Enforce enterprise governance policies
+                local http = require "resty.http"
+                local httpc = http.new()
+                
+                -- Check governance level
+                local res, err = httpc:request_uri("http://organisation-service:8086/api/organisation/organizations/" .. organization_id .. "/governance/validate", {
+                  method = "POST",
+                  headers = {
+                    ["Content-Type"] = "application/json",
+                    ["Authorization"] = kong.request.get_header("Authorization")
+                  },
+                  body = '{"resource": "enterprise-service", "action": "access", "governance_level": "ENTERPRISE"}'
+                })
+                
+                if not res then
+                  kong.log.err("Failed to validate enterprise governance: ", err)
+                  kong.response.exit(500, { message = "Governance validation failed" })
+                end
+                
+                if res.status ~= 200 then
+                  kong.response.exit(403, { message = "Access denied by enterprise governance policy" })
+                end
+                
+                -- Log enterprise access for audit
+                kong.log.info("Enterprise service accessed by organization: ", organization_id)
+              end
+              
+              enforce_enterprise_governance()
+        tags: ["tenant-c", "governance-enforcement", "enterprise"]
+
+# =============================================================================
+# GLOBAL ORGANIZATIONAL POLICY ENFORCEMENT
+# =============================================================================
+
+plugins:
+  # Global Policy Validation
+  - name: pre-function
+    config:
+      access:
+        - |
+          local function global_policy_validation()
+            local organization_id = kong.request.get_header("X-Organization-ID")
+            if not organization_id then
+              return -- Skip for public endpoints
+            end
+            
+            -- Validate global organizational policies
+            local http = require "resty.http"
+            local httpc = http.new()
+            
+            local res, err = httpc:request_uri("http://organisation-service:8086/api/organisation/policies/global/validate", {
+              method = "POST",
+              headers = {
+                ["Content-Type"] = "application/json",
+                ["Authorization"] = kong.request.get_header("Authorization")
+              },
+              body = '{"organization_id": "' .. organization_id .. '", "resource": "' .. kong.request.get_path() .. '", "action": "' .. kong.request.get_method() .. '"}'
+            })
+            
+            if not res then
+              kong.log.err("Global policy validation failed: ", err)
+              return -- Continue with request
+            end
+            
+            if res.status ~= 200 then
+              kong.response.exit(403, { message = "Access denied by global organizational policy" })
+            end
+          end
+          
+          global_policy_validation()
+    tags: ["global", "policy-validation"]
+
+  # Organizational Audit Logging
+  - name: http-log
+    config:
+      http_endpoint: "http://organisation-service:8086/api/organisation/audit/logs"
+      method: "POST"
+      timeout: 10000
+      keepalive: 60000
+      custom_fields_by_lua:
+        organization_id: "return kong.request.get_header('X-Organization-ID')"
+        tenant_id: "return kong.request.get_header('X-Tenant-ID')"
+        user_id: "return kong.request.get_header('X-User-ID')"
+        request_id: "return kong.request.get_header('X-Request-ID')"
+        ip_address: "return kong.client.get_forwarded_ip()"
+        user_agent: "return kong.request.get_header('User-Agent')"
+        session_id: "return kong.request.get_header('X-Session-ID')"
+        compliance_category: "return 'API_ACCESS'"
+        risk_level: "return 'LOW'"
+    tags: ["global", "audit-logging"]
+
+  # Dynamic Rate Limiting Based on Organization Tier
+  - name: pre-function
+    config:
+      access:
+        - |
+          local function dynamic_rate_limiting()
+            local organization_id = kong.request.get_header("X-Organization-ID")
+            if not organization_id then
+              return -- Skip for public endpoints
+            end
+            
+            -- Get organization tier and apply dynamic rate limiting
+            local http = require "resty.http"
+            local httpc = http.new()
+            
+            local res, err = httpc:request_uri("http://organisation-service:8086/api/organisation/organizations/" .. organization_id .. "/tier", {
+              method = "GET",
+              headers = {
+                ["Authorization"] = kong.request.get_header("Authorization")
+              }
+            })
+            
+            if res and res.status == 200 then
+              local body = cjson.decode(res.body)
+              local tier = body.tier
+              
+              -- Apply tier-specific rate limiting
+              if tier == "STARTER" then
+                kong.service.set_upstream("tenant-a-enhanced-user-service")
+              elseif tier == "PROFESSIONAL" then
+                kong.service.set_upstream("tenant-b-enhanced-analytics-service")
+              elseif tier == "ENTERPRISE" then
+                kong.service.set_upstream("tenant-c-enterprise-service")
+              end
+            end
+          end
+          
+          dynamic_rate_limiting()
+    tags: ["global", "dynamic-routing"]
+
+# =============================================================================
+# ORGANIZATIONAL COMPLIANCE MONITORING
+# =============================================================================
+
+  # Compliance Status Check
+  - name: pre-function
+    config:
+      access:
+        - |
+          local function compliance_status_check()
+            local organization_id = kong.request.get_header("X-Organization-ID")
+            if not organization_id then
+              return
+            end
+            
+            -- Check if organization is in compliance
+            local http = require "resty.http"
+            local httpc = http.new()
+            
+            local res, err = httpc:request_uri("http://organisation-service:8086/api/organisation/organizations/" .. organization_id .. "/compliance/status", {
+              method = "GET",
+              headers = {
+                ["Authorization"] = kong.request.get_header("Authorization")
+              }
+            })
+            
+            if res and res.status == 200 then
+              local body = cjson.decode(res.body)
+              if body.compliance_status == "NON_COMPLIANT" then
+                -- Log compliance violation
+                kong.log.warn("Organization ", organization_id, " is not in compliance")
+                
+                -- Apply stricter policies for non-compliant organizations
+                kong.response.set_header("X-Compliance-Status", "NON_COMPLIANT")
+                kong.response.set_header("X-Compliance-Required", "true")
+              end
+            end
+          end
+          
+          compliance_status_check()
+    tags: ["global", "compliance-monitoring"]
+
+# =============================================================================
+# ORGANIZATIONAL METRICS COLLECTION
+# =============================================================================
+
+  # Metrics Collection
+  - name: pre-function
+    config:
+      access:
+        - |
+          local function collect_organizational_metrics()
+            local organization_id = kong.request.get_header("X-Organization-ID")
+            if not organization_id then
+              return
+            end
+            
+            -- Collect and send metrics to organizational management service
+            local http = require "resty.http"
+            local httpc = http.new()
+            
+            local metrics = {
+              organization_id = organization_id,
+              metric_name = "api_request",
+              metric_value = 1,
+              metric_unit = "count",
+              metric_category = "api_usage",
+              recorded_at = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+              metadata = {
+                path = kong.request.get_path(),
+                method = kong.request.get_method(),
+                status = kong.response.get_status()
+              }
+            }
+            
+            local res, err = httpc:request_uri("http://organisation-service:8086/api/organisation/metrics", {
+              method = "POST",
+              headers = {
+                ["Content-Type"] = "application/json",
+                ["Authorization"] = kong.request.get_header("Authorization")
+              },
+              body = cjson.encode(metrics)
+            })
+            
+            if not res then
+              kong.log.err("Failed to send metrics: ", err)
+            end
+          end
+          
+          collect_organizational_metrics()
+    tags: ["global", "metrics-collection"]
+
+# =============================================================================
+# ORGANIZATIONAL ALERTING
+# =============================================================================
+
+  # Alert Generation
+  - name: pre-function
+    config:
+      access:
+        - |
+          local function generate_organizational_alerts()
+            local organization_id = kong.request.get_header("X-Organization-ID")
+            if not organization_id then
+              return
+            end
+            
+            -- Check for conditions that require alerts
+            local status = kong.response.get_status()
+            if status >= 400 then
+              -- Generate alert for API errors
+              local http = require "resty.http"
+              local httpc = http.new()
+              
+              local alert = {
+                organization_id = organization_id,
+                alert_type = "API_ERROR",
+                alert_severity = status >= 500 and "HIGH" or "MEDIUM",
+                alert_title = "API Error Detected",
+                alert_message = "API endpoint returned status " .. status,
+                alert_data = {
+                  path = kong.request.get_path(),
+                  method = kong.request.get_method(),
+                  status = status,
+                  timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+                }
+              }
+              
+              local res, err = httpc:request_uri("http://organisation-service:8086/api/organisation/alerts", {
+                method = "POST",
+                headers = {
+                  ["Content-Type"] = "application/json",
+                  ["Authorization"] = kong.request.get_header("Authorization")
+                },
+                body = cjson.encode(alert)
+              })
+              
+              if not res then
+                kong.log.err("Failed to create alert: ", err)
+              end
+            end
+          end
+          
+          generate_organizational_alerts()
+    tags: ["global", "alert-generation"]
+
+# =============================================================================
+# NOTES ON IMPLEMENTATION:
+# =============================================================================
+# 1. This configuration integrates with the organizational management service
+# 2. All requests must include X-Organization-ID header for policy enforcement
+# 3. Dynamic rate limiting based on organization tier
+# 4. Compliance monitoring and enforcement
+# 5. Comprehensive audit logging for all organizational activities
+# 6. Policy-based access control at multiple levels
+# 7. Metrics collection for organizational analytics
+# 8. Alert generation for compliance and security issues
+# 9. Enterprise governance enforcement for premium tiers
+# 10. Global policy validation across all services
+# =============================================================================

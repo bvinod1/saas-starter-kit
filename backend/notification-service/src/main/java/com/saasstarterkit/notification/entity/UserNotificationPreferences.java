@@ -8,6 +8,8 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalTime;
 import java.util.Map;
+import com.saasstarterkit.notification.domain.enums.NotificationChannel;
+import com.saasstarterkit.notification.domain.enums.NotificationPriority;
 
 /**
  * User notification preferences entity
@@ -218,7 +220,7 @@ public class UserNotificationPreferences {
     // HELPER METHODS
     // =============================================
     
-    public boolean isChannelEnabled(NotificationChannel channel) {
+    public boolean isChannelEnabled(com.saasstarterkit.notification.domain.enums.NotificationChannel channel) {
         switch (channel) {
             case EMAIL:
                 return emailEnabled != null && emailEnabled;
@@ -249,7 +251,7 @@ public class UserNotificationPreferences {
         }
     }
     
-    public boolean shouldSendNotification(NotificationPriority priority) {
+    public boolean shouldSendNotification(com.saasstarterkit.notification.domain.enums.NotificationPriority priority) {
         if (priority == NotificationPriority.URGENT && urgentNotificationsAlways) {
             return true;
         }

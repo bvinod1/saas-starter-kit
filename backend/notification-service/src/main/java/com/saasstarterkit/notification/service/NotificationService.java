@@ -6,6 +6,7 @@ import com.saasstarterkit.notification.dto.NotificationEvent;
 import com.saasstarterkit.notification.entity.Notification;
 import com.saasstarterkit.notification.entity.NotificationTemplate;
 import com.saasstarterkit.notification.entity.UserNotificationPreferences;
+import com.saasstarterkit.notification.repository.NotificationRepository;
 import com.saasstarterkit.notification.exception.TemplateProcessingException;
 import com.saasstarterkit.notification.service.channel.NotificationChannelProvider;
 import org.slf4j.Logger;
@@ -214,7 +215,7 @@ public class NotificationService {
     /**
      * Convert notification channel to template channel
      */
-    private NotificationTemplate.NotificationChannel convertToTemplateChannel(Notification.NotificationChannel channel) {
+    private NotificationTemplate.NotificationChannel convertToTemplateChannel(com.saasstarterkit.notification.domain.enums.NotificationChannel channel) {
         switch (channel) {
             case EMAIL:
                 return NotificationTemplate.NotificationChannel.EMAIL;
@@ -228,6 +229,44 @@ public class NotificationService {
                 return NotificationTemplate.NotificationChannel.WEBHOOK;
             default:
                 return NotificationTemplate.NotificationChannel.EMAIL;
+        }
+    }
+    
+    /**
+     * Convert domain notification channel to entity notification channel
+     */
+    private Notification.NotificationChannel convertToEntityChannel(com.saasstarterkit.notification.domain.enums.NotificationChannel channel) {
+        switch (channel) {
+            case EMAIL:
+                return Notification.NotificationChannel.EMAIL;
+            case SMS:
+                return Notification.NotificationChannel.SMS;
+            case PUSH:
+                return Notification.NotificationChannel.PUSH;
+            case IN_APP:
+                return Notification.NotificationChannel.IN_APP;
+            case WEBHOOK:
+                return Notification.NotificationChannel.WEBHOOK;
+            default:
+                return Notification.NotificationChannel.EMAIL;
+        }
+    }
+    
+    /**
+     * Convert domain notification priority to entity notification priority
+     */
+    private Notification.NotificationPriority convertToEntityPriority(com.saasstarterkit.notification.domain.enums.NotificationPriority priority) {
+        switch (priority) {
+            case LOW:
+                return Notification.NotificationPriority.LOW;
+            case NORMAL:
+                return Notification.NotificationPriority.NORMAL;
+            case HIGH:
+                return Notification.NotificationPriority.HIGH;
+            case URGENT:
+                return Notification.NotificationPriority.URGENT;
+            default:
+                return Notification.NotificationPriority.NORMAL;
         }
     }
     
@@ -246,12 +285,12 @@ public class NotificationService {
         notification.setUserId(event.getUserId());
         notification.setTenantId(event.getTenantId());
         notification.setOrganizationId(event.getOrganizationId());
-        notification.setType(provider.getChannelType());
+        notification.setType(convertToEntityChannel(provider.getChannelType()));
         notification.setTitle(processedTemplate.getContent());
         notification.setMessage(processedTemplate.getContent());
         notification.setSubject(processedTemplate.getSubject());
         notification.setRecipient(event.getRecipient());
-        notification.setPriority(event.getPriority() != null ? event.getPriority() : Notification.NotificationPriority.NORMAL);
+        notification.setPriority(event.getPriority() != null ? convertToEntityPriority(event.getPriority()) : Notification.NotificationPriority.NORMAL);
         notification.setStatus(Notification.NotificationStatus.PENDING);
         notification.setMaxAttempts(event.getMaxRetries() != null ? event.getMaxRetries() : 3);
         notification.setSourceEvent(event.getSourceEvent());

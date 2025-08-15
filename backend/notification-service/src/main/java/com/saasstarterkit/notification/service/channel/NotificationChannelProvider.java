@@ -13,7 +13,7 @@ public interface NotificationChannelProvider {
     /**
      * Get the channel type this provider handles
      */
-    Notification.NotificationChannel getChannelType();
+    com.saasstarterkit.notification.domain.enums.NotificationChannel getChannelType();
     
     /**
      * Check if this provider can handle the given notification

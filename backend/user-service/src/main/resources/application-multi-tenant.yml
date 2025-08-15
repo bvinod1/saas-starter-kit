@@ -1,0 +1,343 @@
+# Multi-Tenant SaaS Configuration with Compliance and Governance
+# This profile should be used for production multi-tenant deployments
+
+spring:
+  profiles:
+    active: multi-tenant
+  application:
+    name: user-service-multi-tenant
+
+# Multi-Tenant Configuration
+tenant:
+  # Tenant isolation strategy
+  isolation:
+    strategy: SCHEMA_PER_TENANT  # SCHEMA_PER_TENANT, DATABASE_PER_TENANT, ROW_LEVEL_SECURITY
+    schema-prefix: tenant_
+    default-schema: public
+    management-schema: tenant_management
+    shared-schema: shared
+    
+  # Tenant provisioning
+  provisioning:
+    auto-create-schema: true
+    auto-create-tables: true
+    validate-schema: true
+    
+  # Tenant context resolution
+  context:
+    header-names:
+      - X-Tenant-ID
+      - X-Tenant
+      - X-Organization-ID
+    path-patterns:
+      - /api/tenants/{tenantId}/**
+      - /api/organizations/{orgId}/tenants/{tenantId}/**
+    fallback-strategy: THROW_EXCEPTION  # THROW_EXCEPTION, USE_DEFAULT, LOG_WARNING
+
+# Compliance and Governance Configuration
+compliance:
+  # Data classification levels
+  data-classification:
+    pii-high:
+      - ssn
+      - creditCard
+      - passportNumber
+      - nationalId
+      - biometricData
+    pii-medium:
+      - email
+      - phone
+      - address
+      - dateOfBirth
+      - gender
+    pii-low:
+      - firstName
+      - lastName
+      - company
+      - jobTitle
+      - preferences
+    public:
+      - publicProfile
+      - announcements
+      - systemMessages
+      
+  # Compliance frameworks
+  frameworks:
+    gdpr:
+      enabled: true
+      data-retention-days: 2555  # 7 years
+      right-to-erasure: true
+      data-portability: true
+      consent-management: true
+    hipaa:
+      enabled: false  # Enable for healthcare tenants
+      phi-protection: true
+      audit-trail: true
+      encryption-required: true
+    sox:
+      enabled: false  # Enable for financial tenants
+      financial-data-protection: true
+      access-controls: true
+      change-management: true
+    pci-dss:
+      enabled: false  # Enable for payment processing
+      card-data-protection: true
+      encryption-standards: true
+      access-monitoring: true
+      
+  # Data governance
+  governance:
+    data-retention:
+      default-days: 365
+      pii-high-days: 2555
+      pii-medium-days: 1095
+      pii-low-days: 365
+      public-days: 90
+    data-encryption:
+      at-rest: true
+      in-transit: true
+      algorithm: AES-256-GCM
+    access-controls:
+      role-based: true
+      multi-factor: false
+      session-timeout: 3600
+      max-login-attempts: 5
+      
+  # Audit and monitoring
+  audit:
+    enabled: true
+    log-level: INFO
+    events:
+      - USER_LOGIN
+      - USER_LOGOUT
+      - DATA_ACCESS
+      - DATA_MODIFICATION
+      - PRIVILEGE_CHANGE
+      - CONFIGURATION_CHANGE
+    retention:
+      audit-logs-days: 2555
+      security-events-days: 2555
+      performance-metrics-days: 1095
+
+# Security Configuration
+security:
+  # Multi-tenant security
+  multi-tenant:
+    tenant-isolation: true
+    cross-tenant-access: false
+    tenant-data-encryption: true
+    tenant-key-rotation: true
+    
+  # Authentication and authorization
+  auth:
+    jwt:
+      secret: ${JWT_SECRET:DUO9HD24VrhZWLnypYn/gKpcihfBBkKl7wfaNKUPPOs=}
+      expiration: 86400000  # 24 hours
+      refresh-expiration: 604800000  # 7 days
+    keycloak:
+      multi-tenant: true
+      tenant-realm-mapping: true
+      dynamic-client-registration: true
+      
+  # Data protection
+  data-protection:
+    masking:
+      enabled: true
+      fields:
+        - ssn
+        - creditCard
+        - email
+        - phone
+    anonymization:
+      enabled: true
+      algorithm: HASH_SALT
+    pseudonymization:
+      enabled: true
+      reversible: false
+
+# Logging Configuration for Multi-Tenant Compliance
+logging:
+  level:
+    com.saasstarterkit.user: INFO
+    com.saasstarterkit.user.tenant: DEBUG
+    com.saasstarterkit.user.compliance: DEBUG
+    com.saasstarterkit.user.security: DEBUG
+    org.springframework.security: INFO
+    org.springframework.web: INFO
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+    
+  # Structured logging for compliance
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{tenantId}] [%X{userId}] [%X{correlationId}] %-5level %logger{36} - %msg%n"
+    
+  # File logging with tenant isolation
+  file:
+    name: logs/user-service-${spring.profiles.active}.log
+    max-size: 100MB
+    max-history: 30
+    
+  # Logstash integration
+  logstash:
+    enabled: true
+    host: ${LOGSTASH_HOST:localhost}
+    port: ${LOGSTASH_PORT:5000}
+    queue-size: 1000
+    batch-size: 100
+
+# Management endpoints with tenant context
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,trace,loggers,tenant,compliance
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: always
+    tenant:
+      show-details: true
+    compliance:
+      show-details: true
+      
+  # Metrics with tenant context
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${spring.profiles.active}
+      platform: multi-tenant-saas
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        tenant.operations: true
+        compliance.events: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+        tenant.operations: 0.5, 0.95, 0.99
+        compliance.events: 0.5, 0.95, 0.99
+
+# Elastic APM Configuration for Multi-Tenant Tracing
+elastic:
+  apm:
+    server-url: ${ELASTIC_APM_SERVER_URL:http://localhost:8200}
+    service-name: ${spring.application.name}
+    application-packages: com.saasstarterkit.user
+    log-level: INFO
+    capture-body: all
+    capture-headers: true
+    transaction-max-spans: 1000
+    span-min-duration: 1ms
+    transaction-sample-rate: 1.0
+    span-sample-rate: 1.0
+    # Multi-tenant context propagation
+    context-propagation:
+      tenant-id: true
+      user-id: true
+      correlation-id: true
+      compliance-level: true
+
+# Performance and Monitoring
+performance:
+  # Tenant operation monitoring
+  tenant:
+    max-concurrent-operations: 100
+    operation-timeout: 30000
+    connection-pool-size: 20
+    
+  # Compliance monitoring
+  compliance:
+    audit-queue-size: 1000
+    audit-batch-size: 100
+    audit-timeout: 5000
+    
+  # Data access monitoring
+  data-access:
+    slow-query-threshold: 1000
+    max-result-size: 10000
+    query-timeout: 30000
+
+# OpenTelemetry Configuration for Multi-Tenant Tracing
+opentelemetry:
+  service:
+    name: user-service-multi-tenant
+    version: 1.0.0
+    namespace: saas-starter-kit
+  collector:
+    endpoint: http://localhost:4317
+  sampling:
+    probability: 1.0
+  propagation:
+    type: w3c
+  instrumentation:
+    spring-boot: true
+    spring-web: true
+    jdbc: true
+    redis: true
+    http-client: true
+  # Multi-tenant context propagation
+  context-propagation:
+    tenant-id: true
+    user-id: true
+    correlation-id: true
+    compliance-level: true
+    business-context: true
+  # Span attributes for multi-tenant compliance
+  span-attributes:
+    business-tenant-id: true
+    business-user-id: true
+    business-operation: true
+    compliance-level: true
+    data-sensitivity: true
+    audit-required: true
+
+# External Service Configuration
+external:
+  # Compliance reporting services
+  compliance:
+    reporting:
+      enabled: false
+      endpoint: ${COMPLIANCE_REPORTING_ENDPOINT:}
+      api-key: ${COMPLIANCE_REPORTING_API_KEY:}
+      
+  # Data protection services
+  data-protection:
+    encryption-service:
+      enabled: true
+      endpoint: ${ENCRYPTION_SERVICE_ENDPOINT:http://localhost:8085}
+      api-key: ${ENCRYPTION_SERVICE_API_KEY:}
+      
+  # Audit services
+  audit:
+    external-audit:
+      enabled: false
+      endpoint: ${EXTERNAL_AUDIT_ENDPOINT:}
+      api-key: ${EXTERNAL_AUDIT_API_KEY:}
+
+# Feature Flags for Multi-Tenant Compliance
+features:
+  multi-tenant:
+    enabled: true
+    tenant-isolation: true
+    cross-tenant-operations: false
+    
+  compliance:
+    gdpr: true
+    hipaa: false
+    sox: false
+    pci-dss: false
+    
+  security:
+    data-encryption: true
+    access-controls: true
+    audit-trail: true
+    tenant-key-rotation: true
+    
+  monitoring:
+    tenant-metrics: true
+    compliance-events: true
+    security-events: true
+    performance-metrics: true

@@ -3,67 +3,116 @@ package com.saasstarterkit.auth.service;
 import com.saasstarterkit.auth.dto.LoginRequest;
 import com.saasstarterkit.auth.dto.RegisterRequest;
 import com.saasstarterkit.auth.dto.RegisterResponse;
-import com.saasstarterkit.auth.entity.User;
+import com.saasstarterkit.auth.dto.TokenResponse;
 import com.saasstarterkit.auth.exception.UserAlreadyExistsException;
 import com.saasstarterkit.auth.exception.ValidationException;
-import com.saasstarterkit.auth.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
 public class AuthService {
 
     @Autowired
-    private UserService userService;
+    private KeycloakService keycloakService;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private JdbcTemplate jdbcTemplate;
 
-    @Autowired
-    private JwtUtil jwtUtil;
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+
+    public AuthService() {
+        this.restTemplate = new RestTemplate();
+        this.objectMapper = new ObjectMapper();
+    }
 
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
         // Validate request
         validateRegistrationRequest(request);
 
-        // Check if user already exists
-        if (userService.existsByEmail(request.getEmail())) {
-            throw new UserAlreadyExistsException("User with email " + request.getEmail() + " already exists");
+        try {
+            // 1. Create user in Keycloak (this also creates the organization client)
+            RegisterResponse keycloakResponse = keycloakService.register(request);
+            String keycloakUserId = keycloakResponse.getData().getId();
+            String organizationClientId = keycloakResponse.getData().getOrganizationClientId();
+            
+            System.out.println("Successfully created user in Keycloak: " + keycloakUserId);
+            System.out.println("Organization client ID: " + organizationClientId);
+
+            // 2. Create tenant in PostgreSQL using the organization client ID
+            try {
+                createTenantInDatabase(request, keycloakUserId, organizationClientId);
+                System.out.println("Successfully created tenant in database");
+            } catch (Exception e) {
+                System.err.println("Warning: Failed to create tenant in database: " + e.getMessage());
+                // Don't fail registration if tenant creation fails
+            }
+
+            // Return the Keycloak response
+            return keycloakResponse;
+
+        } catch (Exception e) {
+            throw new ValidationException("Registration failed: " + e.getMessage());
         }
+    }
 
-        // Create user
-        String userId = UUID.randomUUID().toString();
-        String hashedPassword = passwordEncoder.encode(request.getPassword());
+    private void createTenantInDatabase(RegisterRequest request, String keycloakUserId, String organizationClientId) {
+        try {
+            // Generate tenant slug from organization name
+            String tenantSlug = generateTenantSlug(request.getOrganizationName());
+            
+            // Create tenant using the database function
+            String sql = "SELECT create_tenant(?, ?, ?, ?)";
+            
+            System.out.println("Creating tenant with:");
+            System.out.println("  - Name: " + request.getOrganizationName());
+            System.out.println("  - Slug: " + tenantSlug);
+            System.out.println("  - Realm: saas-starter-kit");
+            System.out.println("  - Client: " + organizationClientId);
+            
+            // Call the create_tenant function
+            UUID tenantId = jdbcTemplate.queryForObject(sql, UUID.class, 
+                request.getOrganizationName(), 
+                tenantSlug, 
+                "saas-starter-kit", 
+                organizationClientId
+            );
+            
+            System.out.println("Created tenant with ID: " + tenantId);
+            
+        } catch (Exception e) {
+            System.err.println("Error creating tenant in database: " + e.getMessage());
+            throw e;
+        }
+    }
+
+    private String generateTenantSlug(String organizationName) {
+        // Convert organization name to a valid slug
+        String slug = organizationName.toLowerCase()
+            .replaceAll("[^a-zA-Z0-9]", "-")
+            .replaceAll("-+", "-")
+            .replaceAll("^-|-$", "");
         
-        User user = new User();
-        user.setId(userId);
-        user.setEmail(request.getEmail());
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setPassword(hashedPassword);
-        user.setEnabled(true);
-        user.setEmailVerified(false);
-
-        User savedUser = userService.createUser(user);
-
-        // Generate JWT token
-        String token = jwtUtil.generateToken(savedUser);
-
-        // Create response
-        RegisterResponse.UserData userData = new RegisterResponse.UserData(
-            savedUser.getId(),
-            savedUser.getEmail(),
-            savedUser.getFirstName(),
-            savedUser.getLastName(),
-            token
-        );
-
-        return RegisterResponse.success("User registered successfully", userData);
+        // Ensure it's not too long and add uniqueness
+        if (slug.length() > 50) {
+            slug = slug.substring(0, 50);
+        }
+        
+        return slug + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
 
     private void validateRegistrationRequest(RegisterRequest request) {
@@ -79,32 +128,54 @@ public class AuthService {
 
     @Transactional
     public RegisterResponse login(LoginRequest request) {
-        // Find user by email
-        User user = userService.findByEmail(request.getEmail())
-            .orElseThrow(() -> new ValidationException("Invalid email or password"));
-
-        // Verify password
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new ValidationException("Invalid email or password");
+        try {
+            return keycloakService.login(request);
+        } catch (Exception e) {
+            throw new ValidationException("Login failed: " + e.getMessage());
         }
+    }
 
-        // Check if user is enabled
-        if (!user.isEnabled()) {
-            throw new ValidationException("Account is disabled. Please contact support.");
+    /**
+     * Refresh access token using refresh token
+     */
+    public TokenResponse refreshToken(String refreshToken) {
+        try {
+            return keycloakService.refreshToken(refreshToken);
+        } catch (Exception e) {
+            throw new ValidationException("Token refresh failed: " + e.getMessage());
         }
+    }
 
-        // Generate JWT token
-        String token = jwtUtil.generateToken(user);
+    /**
+     * Validate token with Keycloak
+     */
+    public boolean validateToken(String token) {
+        try {
+            return keycloakService.validateToken(token);
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
-        // Create response
-        RegisterResponse.UserData userData = new RegisterResponse.UserData(
-            user.getId(),
-            user.getEmail(),
-            user.getFirstName(),
-            user.getLastName(),
-            token
-        );
+    /**
+     * Check if token is expired
+     */
+    public boolean isTokenExpired(String token) {
+        try {
+            return keycloakService.isTokenExpired(token);
+        } catch (Exception e) {
+            return true;
+        }
+    }
 
-        return RegisterResponse.success("Login successful", userData);
+    /**
+     * Get token expiration time
+     */
+    public long getTokenExpirationTime(String token) {
+        try {
+            return keycloakService.getTokenExpirationTime(token);
+        } catch (Exception e) {
+            return 0;
+        }
     }
 } 

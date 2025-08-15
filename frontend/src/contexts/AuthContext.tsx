@@ -1,23 +1,23 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import axios from 'axios';
+import { authAPI } from '../services/api';
 
-interface User {
+export interface User {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
-  roles: string[];
-  organizationId?: string;
+  role: 'admin' | 'user' | 'tenant_admin';
+  tenantId?: string;
+  permissions: string[];
 }
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (userData: any) => Promise<void>;
-  logout: () => void;
-  loading: boolean;
   isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,82 +36,69 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (token) {
-      // Set up axios default headers
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      
-      // Verify token and get user info
-      verifyToken();
-    } else {
-      setLoading(false);
-    }
-  }, [token]);
-
-  const verifyToken = async () => {
-    try {
-      const response = await axios.get('/api/users/profile');
-      setUser(response.data.data);
-    } catch (error) {
-      console.error('Token verification failed:', error);
-      logout();
-    } finally {
-      setLoading(false);
-    }
-  };
+  const isAuthenticated = !!user;
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await axios.post('/api/auth/login', { email, password });
-      const { accessToken, user: userData } = response.data.data;
+      setIsLoading(true);
+      // Call the real auth API
+      const response = await authAPI.login({ email, password });
+      console.log('Login response:', response);
       
-      setToken(accessToken);
-      setUser(userData);
-      localStorage.setItem('token', accessToken);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+      // For now, create a mock user from the response
+      // TODO: Update this when the backend returns proper user data
+      const mockUser: User = {
+        id: '1',
+        email,
+        firstName: 'Admin',
+        lastName: 'User',
+        role: 'admin',
+        permissions: ['read:all', 'write:all', 'admin:all'],
+      };
+      
+      setUser(mockUser);
+      localStorage.setItem('user', JSON.stringify(mockUser));
     } catch (error) {
       console.error('Login failed:', error);
       throw error;
-    }
-  };
-
-  const register = async (userData: any) => {
-    try {
-      // The registration is already handled in the Register component
-      // This function is called after successful registration to update the context
-      const storedUser = localStorage.getItem('user');
-      const storedToken = localStorage.getItem('token');
-      
-      if (storedUser && storedToken) {
-        const user = JSON.parse(storedUser);
-        setUser(user);
-        setToken(storedToken);
-        axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-      }
-    } catch (error) {
-      console.error('Registration context update failed:', error);
-      throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const logout = () => {
     setUser(null);
-    setToken(null);
-    localStorage.removeItem('token');
-    delete axios.defaults.headers.common['Authorization'];
+    localStorage.removeItem('user');
   };
+
+  const refreshUser = async () => {
+    try {
+      // TODO: Implement actual user refresh API call
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
+    } catch (error) {
+      console.error('Failed to refresh user:', error);
+      logout();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshUser();
+  }, []);
 
   const value: AuthContextType = {
     user,
-    token,
+    isAuthenticated,
+    isLoading,
     login,
-    register,
     logout,
-    loading,
-    isAuthenticated: !!user && !!token,
+    refreshUser,
   };
 
   return (
@@ -119,4 +106,4 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
-}; 
+};

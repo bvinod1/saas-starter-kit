@@ -12,73 +12,46 @@ import java.util.Set;
 @Table(name = "roles", schema = "auth")
 @EntityListeners(AuditingEntityListener.class)
 public class Role {
-    
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private String id;
-    
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
     @Column(unique = true, nullable = false)
     private String name;
-    
+
     private String description;
-    
+
     @CreatedDate
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
-    
-    @ManyToMany(mappedBy = "roles")
-    private Set<User> users = new HashSet<>();
-    
-    // Constructors
+
+    // Note: User-Role relationships are now managed by the IAM system
+    // This entity is kept for backward compatibility but the relationship is removed
+
+    // Default constructor
     public Role() {}
-    
+
+    // Constructor with name
     public Role(String name) {
         this.name = name;
     }
-    
+
+    // Constructor with name and description
     public Role(String name, String description) {
         this.name = name;
         this.description = description;
     }
-    
-    // Getters and Setters
-    public String getId() {
-        return id;
-    }
-    
-    public void setId(String id) {
-        this.id = id;
-    }
-    
-    public String getName() {
-        return name;
-    }
-    
-    public void setName(String name) {
-        this.name = name;
-    }
-    
-    public String getDescription() {
-        return description;
-    }
-    
-    public void setDescription(String description) {
-        this.description = description;
-    }
-    
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-    
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-    
-    public Set<User> getUsers() {
-        return users;
-    }
-    
-    public void setUsers(Set<User> users) {
-        this.users = users;
-    }
+
+    // Getters
+    public Long getId() { return id; }
+    public String getName() { return name; }
+    public String getDescription() { return description; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    // Note: User-Role relationships are now managed by the IAM system
+
+    // Setters
+    public void setId(Long id) { this.id = id; }
+    public void setName(String name) { this.name = name; }
+    public void setDescription(String description) { this.description = description; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 } 

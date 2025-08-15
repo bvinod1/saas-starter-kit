@@ -1,6 +1,8 @@
 package com.saasstarterkit.notification.repository;
 
 import com.saasstarterkit.notification.entity.Notification;
+import com.saasstarterkit.notification.domain.enums.NotificationPriority;
+import com.saasstarterkit.notification.domain.enums.NotificationChannel;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,143 +13,107 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
-/**
- * Repository interface for Notification entities
- */
 @Repository
-public interface NotificationRepository extends JpaRepository<Notification, Long> {
+public interface NotificationRepository extends JpaRepository<Notification, UUID> {
     
-    /**
-     * Find notifications by user ID
-     */
-    List<Notification> findByUserIdOrderByCreatedAtDesc(String userId);
+    List<Notification> findByUserId(String userId);
     
-    /**
-     * Find notifications by user ID with pagination
-     */
+    List<Notification> findByTenantId(String tenantId);
+    
+    List<Notification> findByUserIdAndTenantId(String userId, String tenantId);
+    
+    List<Notification> findByUserIdAndRead(String userId, boolean read);
+    
+    List<Notification> findByTenantIdAndRead(String tenantId, boolean read);
+    
+    List<Notification> findByUserIdAndPriority(String userId, NotificationPriority priority);
+    
+    List<Notification> findByTenantIdAndPriority(String tenantId, NotificationPriority priority);
+    
+    List<Notification> findByUserIdAndChannel(String userId, NotificationChannel channel);
+    
+    List<Notification> findByTenantIdAndChannel(String tenantId, NotificationChannel channel);
+    
+    List<Notification> findByUserIdAndCreatedAtBetween(String userId, LocalDateTime startDate, LocalDateTime endDate);
+    
+    List<Notification> findByTenantIdAndCreatedAtBetween(String tenantId, LocalDateTime startDate, LocalDateTime endDate);
+    
+    List<Notification> findByUserIdAndPriorityIn(String userId, List<NotificationPriority> priorities);
+    
+    List<Notification> findByTenantIdAndPriorityIn(String tenantId, List<NotificationPriority> priorities);
+    
+    List<Notification> findByUserIdAndChannelIn(String userId, List<NotificationChannel> channels);
+    
+    List<Notification> findByTenantIdAndChannelIn(String tenantId, List<NotificationChannel> channels);
+    
     Page<Notification> findByUserIdOrderByCreatedAtDesc(String userId, Pageable pageable);
     
-    /**
-     * Find notifications by tenant ID
-     */
-    List<Notification> findByTenantIdOrderByCreatedAtDesc(String tenantId);
+    Page<Notification> findByTenantIdOrderByCreatedAtDesc(String tenantId, Pageable pageable);
     
-    /**
-     * Find notifications by organization ID
-     */
-    List<Notification> findByOrganizationIdOrderByCreatedAtDesc(String organizationId);
+    Page<Notification> findByUserIdAndReadOrderByCreatedAtDesc(String userId, boolean read, Pageable pageable);
     
-    /**
-     * Find notifications by status
-     */
-    List<Notification> findByStatusOrderByCreatedAtDesc(Notification.NotificationStatus status);
+    Page<Notification> findByTenantIdAndReadOrderByCreatedAtDesc(String tenantId, boolean read, Pageable pageable);
     
-    /**
-     * Find notifications by user ID and status
-     */
-    List<Notification> findByUserIdAndStatusOrderByCreatedAtDesc(String userId, Notification.NotificationStatus status);
+    @Query("SELECT n FROM Notification n WHERE n.userId = :userId AND n.priority IN :priorities ORDER BY n.createdAt DESC")
+    Page<Notification> findByUserIdAndPriorityInOrderByCreatedAtDesc(@Param("userId") String userId, 
+                                                                   @Param("priorities") List<NotificationPriority> priorities, 
+                                                                   Pageable pageable);
     
-    /**
-     * Find notifications by user ID and channel type
-     */
-    List<Notification> findByUserIdAndTypeOrderByCreatedAtDesc(String userId, Notification.NotificationChannel type);
+    @Query("SELECT n FROM Notification n WHERE n.tenantId = :tenantId AND n.priority IN :priorities ORDER BY n.createdAt DESC")
+    Page<Notification> findByTenantIdAndPriorityInOrderByCreatedAtDesc(@Param("tenantId") String tenantId, 
+                                                                     @Param("priorities") List<NotificationPriority> priorities, 
+                                                                     Pageable pageable);
     
-    /**
-     * Find notifications by tenant ID and status
-     */
-    List<Notification> findByTenantIdAndStatusOrderByCreatedAtDesc(String tenantId, Notification.NotificationStatus status);
+    @Query("SELECT COUNT(n) FROM Notification n WHERE n.userId = :userId AND n.read = false")
+    long countUnreadByUserId(@Param("userId") String userId);
     
-    /**
-     * Find notifications by correlation ID
-     */
-    List<Notification> findByCorrelationId(String correlationId);
+    @Query("SELECT COUNT(n) FROM Notification n WHERE n.tenantId = :tenantId AND n.read = false")
+    long countUnreadByTenantId(@Param("tenantId") String tenantId);
     
-    /**
-     * Find notifications by source event
-     */
-    List<Notification> findBySourceEventOrderByCreatedAtDesc(String sourceEvent);
+    @Query("SELECT COUNT(n) FROM Notification n WHERE n.userId = :userId AND n.priority = :priority")
+    long countByUserIdAndPriority(@Param("userId") String userId, @Param("priority") NotificationPriority priority);
     
-    /**
-     * Find pending notifications that are ready to be sent
-     */
-    @Query("SELECT n FROM Notification n WHERE n.status = 'PENDING' AND " +
-           "(n.scheduledAt IS NULL OR n.scheduledAt <= :now) AND " +
-           "(n.expiresAt IS NULL OR n.expiresAt > :now)")
-    List<Notification> findPendingNotificationsReadyToSend(@Param("now") LocalDateTime now);
+    @Query("SELECT COUNT(n) FROM Notification n WHERE n.tenantId = :tenantId AND n.priority = :priority")
+    long countByTenantIdAndPriority(@Param("tenantId") String tenantId, @Param("priority") NotificationPriority priority);
     
-    /**
-     * Find failed notifications that can be retried
-     */
-    @Query("SELECT n FROM Notification n WHERE n.status = 'FAILED' AND " +
-           "n.attemptCount < n.maxAttempts AND " +
-           "(n.expiresAt IS NULL OR n.expiresAt > :now)")
-    List<Notification> findFailedNotificationsForRetry(@Param("now") LocalDateTime now);
+    @Query("SELECT n FROM Notification n WHERE n.userId = :userId AND n.priority IN ('URGENT', 'CRITICAL', 'FATAL') ORDER BY n.createdAt DESC")
+    List<Notification> findUrgentByUserId(@Param("userId") String userId);
     
-    /**
-     * Find expired notifications
-     */
-    @Query("SELECT n FROM Notification n WHERE n.expiresAt IS NOT NULL AND n.expiresAt <= :now")
-    List<Notification> findExpiredNotifications(@Param("now") LocalDateTime now);
+    @Query("SELECT n FROM Notification n WHERE n.tenantId = :tenantId AND n.priority IN ('URGENT', 'CRITICAL', 'FATAL') ORDER BY n.createdAt DESC")
+    List<Notification> findUrgentByTenantId(@Param("tenantId") String tenantId);
     
-    /**
-     * Count notifications by user ID and status
-     */
-    long countByUserIdAndStatus(String userId, Notification.NotificationStatus status);
+    @Query("SELECT n FROM Notification n WHERE n.userId = :userId AND n.createdAt >= :since ORDER BY n.createdAt DESC")
+    List<Notification> findRecentByUserId(@Param("userId") String userId, @Param("since") LocalDateTime since);
     
-    /**
-     * Count unread notifications by user ID
-     */
-    @Query("SELECT COUNT(n) FROM Notification n WHERE n.userId = :userId AND n.readAt IS NULL")
-    long countUnreadNotifications(@Param("userId") String userId);
+    @Query("SELECT n FROM Notification n WHERE n.tenantId = :tenantId AND n.createdAt >= :since ORDER BY n.createdAt DESC")
+    List<Notification> findRecentByTenantId(@Param("tenantId") String tenantId, @Param("since") LocalDateTime since);
     
-    /**
-     * Find notifications created within a time range
-     */
-    List<Notification> findByCreatedAtBetweenOrderByCreatedAtDesc(LocalDateTime start, LocalDateTime end);
+    Optional<Notification> findByExternalId(String externalId);
     
-    /**
-     * Find notifications by user ID within a time range
-     */
-    List<Notification> findByUserIdAndCreatedAtBetweenOrderByCreatedAtDesc(String userId, LocalDateTime start, LocalDateTime end);
+    List<Notification> findByTemplateId(UUID templateId);
     
-    /**
-     * Find notifications by priority
-     */
-    List<Notification> findByPriorityOrderByCreatedAtDesc(Notification.NotificationPriority priority);
+    List<Notification> findByStatus(String status);
     
-    /**
-     * Find notifications by user ID and priority
-     */
-    List<Notification> findByUserIdAndPriorityOrderByCreatedAtDesc(String userId, Notification.NotificationPriority priority);
+    List<Notification> findByUserIdAndStatus(String userId, String status);
     
-    /**
-     * Find notifications by category (using JSONB query)
-     */
-    @Query(value = "SELECT * FROM shared.notifications WHERE data->>'category' = :category", nativeQuery = true)
-    List<Notification> findByCategory(@Param("category") String category);
+    List<Notification> findByTenantIdAndStatus(String tenantId, String status);
     
-    /**
-     * Find notifications by user ID and category
-     */
-    @Query(value = "SELECT * FROM shared.notifications WHERE user_id = :userId AND data->>'category' = :category", nativeQuery = true)
-    List<Notification> findByUserIdAndCategory(@Param("userId") String userId, @Param("category") String category);
+    @Query("SELECT DISTINCT n.userId FROM Notification n WHERE n.tenantId = :tenantId")
+    List<String> findDistinctUserIdsByTenantId(@Param("tenantId") String tenantId);
     
-    /**
-     * Delete old notifications (cleanup)
-     */
-    @Query("DELETE FROM Notification n WHERE n.createdAt < :cutoffDate")
-    void deleteOldNotifications(@Param("cutoffDate") LocalDateTime cutoffDate);
+    @Query("SELECT n FROM Notification n WHERE n.userId = :userId AND n.channel = :channel AND n.read = false ORDER BY n.createdAt DESC")
+    List<Notification> findUnreadByUserIdAndChannel(@Param("userId") String userId, @Param("channel") NotificationChannel channel);
     
-    /**
-     * Mark notifications as read by user ID
-     */
-    @Query("UPDATE Notification n SET n.readAt = :readAt WHERE n.userId = :userId AND n.readAt IS NULL")
-    void markNotificationsAsRead(@Param("userId") String userId, @Param("readAt") LocalDateTime readAt);
+    @Query("SELECT n FROM Notification n WHERE n.tenantId = :tenantId AND n.channel = :channel AND n.read = false ORDER BY n.createdAt DESC")
+    List<Notification> findUnreadByTenantIdAndChannel(@Param("tenantId") String tenantId, @Param("channel") NotificationChannel channel);
     
-    /**
-     * Find notifications that need to be sent (for scheduled notifications)
-     */
-    @Query("SELECT n FROM Notification n WHERE n.status = 'SCHEDULED' AND n.scheduledAt <= :now")
-    List<Notification> findScheduledNotificationsReadyToSend(@Param("now") LocalDateTime now);
+    long countByUserId(String userId);
+    
+    long countByTenantId(String tenantId);
+    
+    long countByUserIdAndRead(String userId, boolean read);
+    
+    long countByTenantIdAndRead(String tenantId, boolean read);
 }
