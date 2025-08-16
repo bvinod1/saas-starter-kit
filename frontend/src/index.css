@@ -15,12 +15,15 @@
 /* Basic body styles */
 body {
   margin: 0;
+  padding: 0;
   font-family: 'Gilroy', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: var(--color-green);
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
 code {
@@ -62,17 +65,33 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Hide scrollbars globally */
+/* Allow scrolling by default */
 html, body {
-  overflow: hidden;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* Internet Explorer 10+ */
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+  scrollbar-width: thin; /* Show thin scrollbars in Firefox */
+  -ms-overflow-style: auto; /* Show scrollbars in IE */
 }
 
-/* Hide scrollbars for WebKit browsers (Chrome, Safari, Edge) */
+/* Custom scrollbar styling for WebKit browsers (Chrome, Safari, Edge) */
 html::-webkit-scrollbar, 
 body::-webkit-scrollbar {
-  display: none;
+  width: 8px;
+}
+
+html::-webkit-scrollbar-track, 
+body::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+html::-webkit-scrollbar-thumb, 
+body::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+html::-webkit-scrollbar-thumb:hover, 
+body::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 
 /* Ensure no scrolling on auth pages */
@@ -84,4 +103,28 @@ body::-webkit-scrollbar {
 
 .auth-page::-webkit-scrollbar {
   display: none !important;
+}
+
+/* Ensure landing page can scroll properly */
+.landing-page {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  min-height: 100vh;
+}
+
+/* Ensure all sections are properly spaced and visible */
+.landing-page section {
+  min-height: auto;
+  position: relative;
+}
+
+/* Ensure the page content flows properly */
+.landing-page > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Fix for fixed navigation */
+.landing-page nav {
+  z-index: 50;
 } 

@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { 
   ArrowRightIcon, 
-  UsersIcon,
   ShieldCheckIcon,
   ChartBarIcon,
   RocketLaunchIcon,
@@ -12,7 +11,6 @@ import {
   BuildingOfficeIcon,
   KeyIcon,
   CreditCardIcon,
-  CogIcon,
   BellIcon,
   EyeIcon,
   PuzzlePieceIcon,
@@ -68,7 +66,7 @@ const LandingPage: React.FC = () => {
 
 
   return (
-    <div className="min-h-screen bg-white font-gilroy">
+    <div className="min-h-screen bg-white font-gilroy landing-page">
       {/* Navigation */}
       <nav className="fixed top-0 w-full bg-white/95 backdrop-blur-sm border-b border-gray-100 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -186,11 +184,119 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
+      {/* Benefits Section */}
+      <section className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              viewport={{ once: true }}
+            >
+              <h2 className="text-4xl font-bold text-green mb-4">
+                Why Choose Our SaaS Starter Kit?
+              </h2>
+              <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+                Built by enterprise developers, for enterprise developers. 
+                Save months of development time with battle-tested solutions.
+              </p>
+            </motion.div>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              viewport={{ once: true }}
+              className="text-center p-8 bg-white rounded-xl shadow-sm hover:shadow-lg transition-shadow duration-300"
+            >
+              <div className="w-16 h-16 bg-gradient-to-br from-red to-dark-red rounded-full flex items-center justify-center mx-auto mb-6">
+                <RocketLaunchIcon className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-semibold text-green mb-4">Fast Development</h3>
+              <p className="text-gray-600">
+                Get to market in weeks, not months. Our pre-built components handle the complex 
+                infrastructure so you can focus on your core business logic.
+              </p>
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              viewport={{ once: true }}
+              className="text-center p-8 bg-white rounded-xl shadow-sm hover:shadow-lg transition-shadow duration-300"
+            >
+              <div className="w-16 h-16 bg-gradient-to-br from-red to-dark-red rounded-full flex items-center justify-center mx-auto mb-6">
+                <ShieldCheckIcon className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-semibold text-green mb-4">Enterprise Security</h3>
+              <p className="text-gray-600">
+                Built with security-first principles. Multi-tenant isolation, OAuth2, MFA, 
+                and compliance-ready features out of the box.
+              </p>
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              viewport={{ once: true }}
+              className="text-center p-8 bg-white rounded-xl shadow-sm hover:shadow-lg transition-shadow duration-300"
+            >
+              <div className="w-16 h-16 bg-gradient-to-br from-red to-dark-red rounded-full flex items-center justify-center mx-auto mb-6">
+                <ChartBarIcon className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-semibold text-green mb-4">Scalable Architecture</h3>
+              <p className="text-gray-600">
+                Designed to grow with your business. Microservices architecture, 
+                containerized deployment, and cloud-native design patterns.
+              </p>
+            </motion.div>
+          </div>
+        </div>
+      </section>
 
 
 
+      {/* Call to Action Section */}
+      <section className="py-20 bg-gradient-to-r from-green to-dark-red">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+          >
+            <h2 className="text-4xl font-bold text-white mb-6">
+              Ready to Build Your SaaS Platform?
+            </h2>
+            <p className="text-xl text-gray-200 mb-8 max-w-2xl mx-auto">
+              Join thousands of developers who are building scalable SaaS applications 
+              with our enterprise-ready starter kit.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link 
+                to="/auth/register" 
+                className="bg-red text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-dark-red transition-colors inline-flex items-center"
+              >
+                Get Started Free
+                <ArrowRightIcon className="ml-2 w-5 h-5" />
+              </Link>
+              <Link 
+                to="/auth/login" 
+                className="border-2 border-white text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-white hover:text-green transition-colors"
+              >
+                Sign In
+              </Link>
+            </div>
+          </motion.div>
+        </div>
+      </section>
 
-            {/* Footer */}
+      {/* Footer */}
       <footer className="bg-green text-white py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="flex items-center justify-center mb-4">
