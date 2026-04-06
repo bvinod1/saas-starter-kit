@@ -1,0 +1,191 @@
+openapi: "3.1.0"
+info:
+  title: Tenant Service API
+  version: "1.0.0"
+  description: Tenant lifecycle management.
+
+servers:
+  - url: /api/v1
+
+security:
+  - bearerAuth: []
+
+paths:
+  /tenants:
+    post:
+      summary: Create (provision) a new tenant
+      operationId: createTenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTenantRequest'
+      responses:
+        "202":
+          description: Provisioning accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantResponse'
+        "409":
+          description: Subdomain already taken
+
+    get:
+      summary: List all tenants (super-admin only)
+      operationId: listTenants
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, ACTIVE, SUSPENDED, ARCHIVED]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Paginated tenant list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantPage'
+
+  /tenants/{tenantId}:
+    parameters:
+      - name: tenantId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Get tenant details
+      operationId: getTenant
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantResponse'
+    patch:
+      summary: Update tenant
+      operationId: updateTenant
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTenantRequest'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantResponse'
+    delete:
+      summary: Archive (soft-delete) tenant
+      operationId: archiveTenant
+      responses:
+        "204":
+          description: Archived
+
+  /tenants/{tenantId}/status:
+    get:
+      summary: Get provisioning status
+      operationId: getTenantStatus
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantStatusResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    CreateTenantRequest:
+      type: object
+      required: [name, subdomain, planId]
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        subdomain:
+          type: string
+          pattern: '^[a-z0-9-]{3,50}$'
+        planId:
+          type: string
+          enum: [starter, pro, enterprise]
+
+    UpdateTenantRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, SUSPENDED]
+
+    TenantResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        subdomain:
+          type: string
+        status:
+          type: string
+        planId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    TenantStatusResponse:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, PROVISIONING, ACTIVE, FAILED]
+        errorMessage:
+          type: string
+          nullable: true
+
+    TenantPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/TenantResponse'
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+        page:
+          type: integer

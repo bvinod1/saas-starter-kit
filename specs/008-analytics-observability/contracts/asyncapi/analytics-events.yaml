@@ -1,0 +1,75 @@
+asyncapi: "2.6.0"
+info:
+  title: Analytics & Observability Events
+  version: "1.0.0"
+  description: >
+    Feature usage events consumed by the analytics service for usage
+    reporting and billing telemetry.
+
+servers:
+  rabbitmq:
+    url: amqp://localhost:5672
+    protocol: amqp
+
+channels:
+  "analytics.feature.usage":
+    description: Feature usage event emitted by any service
+    subscribe:
+      message:
+        $ref: '#/components/messages/FeatureUsageEvent'
+
+  "analytics.usage.summary.computed":
+    description: Periodic usage summary published by analytics-service
+    publish:
+      message:
+        $ref: '#/components/messages/UsageSummaryComputedEvent'
+
+components:
+  messages:
+    FeatureUsageEvent:
+      payload:
+        type: object
+        required: [tenantId, feature, action, occurredAt]
+        properties:
+          tenantId:
+            type: string
+            format: uuid
+          userId:
+            type: string
+            format: uuid
+            nullable: true
+          feature:
+            type: string
+            description: Feature identifier, e.g. "user-management"
+          action:
+            type: string
+            description: Action taken, e.g. "create", "read"
+          occurredAt:
+            type: string
+            format: date-time
+          metadata:
+            type: object
+            additionalProperties: true
+
+    UsageSummaryComputedEvent:
+      payload:
+        type: object
+        required: [tenantId, periodStart, periodEnd]
+        properties:
+          tenantId:
+            type: string
+            format: uuid
+          periodStart:
+            type: string
+            format: date
+          periodEnd:
+            type: string
+            format: date
+          activeUsers:
+            type: integer
+          apiCalls:
+            type: integer
+            format: int64
+          computedAt:
+            type: string
+            format: date-time

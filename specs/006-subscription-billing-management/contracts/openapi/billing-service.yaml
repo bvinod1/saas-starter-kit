@@ -1,0 +1,232 @@
+openapi: "3.1.0"
+info:
+  title: Billing Service API
+  version: "1.0.0"
+  description: Subscription and billing management.
+
+servers:
+  - url: /api/v1
+
+security:
+  - bearerAuth: []
+
+paths:
+  /subscriptions:
+    post:
+      summary: Create or upgrade subscription for tenant
+      operationId: createSubscription
+      parameters:
+        - $ref: '#/components/parameters/TenantIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubscriptionRequest'
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResponse'
+
+  /subscriptions/current:
+    get:
+      summary: Get current tenant subscription
+      operationId: getCurrentSubscription
+      parameters:
+        - $ref: '#/components/parameters/TenantIdHeader'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResponse'
+
+  /subscriptions/{subscriptionId}/cancel:
+    post:
+      summary: Cancel subscription
+      operationId: cancelSubscription
+      parameters:
+        - $ref: '#/components/parameters/TenantIdHeader'
+        - name: subscriptionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelSubscriptionRequest'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResponse'
+
+  /invoices:
+    get:
+      summary: List invoices for tenant
+      operationId: listInvoices
+      parameters:
+        - $ref: '#/components/parameters/TenantIdHeader'
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoicePage'
+
+  /billing/webhook:
+    post:
+      summary: Receive provider webhook (Stripe / other)
+      operationId: handleWebhook
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Webhook processed
+
+  /plans:
+    get:
+      summary: List available subscription plans
+      operationId: listPlans
+      security: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlanResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    TenantIdHeader:
+      name: X-Tenant-ID
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    CreateSubscriptionRequest:
+      type: object
+      required: [planId, billingCycle]
+      properties:
+        planId:
+          type: string
+        billingCycle:
+          type: string
+          enum: [MONTHLY, ANNUAL]
+        paymentMethodId:
+          type: string
+          format: uuid
+
+    CancelSubscriptionRequest:
+      type: object
+      properties:
+        cancelAtPeriodEnd:
+          type: boolean
+          default: true
+        reason:
+          type: string
+
+    SubscriptionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        planId:
+          type: string
+        status:
+          type: string
+        billingCycle:
+          type: string
+        currentPeriodStart:
+          type: string
+          format: date-time
+        currentPeriodEnd:
+          type: string
+          format: date-time
+        trialEndsAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    PlanResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        priceMonthly:
+          type: integer
+          description: Price in cents
+        priceAnnual:
+          type: integer
+        features:
+          type: object
+          additionalProperties: true
+
+    InvoicePage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceResponse'
+        totalElements:
+          type: integer
+        page:
+          type: integer
+
+    InvoiceResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        amountCents:
+          type: integer
+        currency:
+          type: string
+        status:
+          type: string
+        dueDate:
+          type: string
+          format: date
+        paidAt:
+          type: string
+          format: date-time
+          nullable: true

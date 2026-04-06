@@ -1,0 +1,232 @@
+openapi: "3.1.0"
+info:
+  title: Organisation Service API
+  version: "1.0.0"
+  description: Organization hierarchy and membership management.
+
+servers:
+  - url: /api/v1
+
+security:
+  - bearerAuth: []
+
+paths:
+  /organizations:
+    get:
+      summary: List organizations for tenant
+      operationId: listOrganizations
+      parameters:
+        - $ref: '#/components/parameters/TenantIdHeader'
+        - name: parentOrgId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrgResponse'
+
+    post:
+      summary: Create organization
+      operationId: createOrganization
+      parameters:
+        - $ref: '#/components/parameters/TenantIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrgRequest'
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgResponse'
+
+  /organizations/{orgId}:
+    parameters:
+      - $ref: '#/components/parameters/TenantIdHeader'
+      - name: orgId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Get organization
+      operationId: getOrganization
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgResponse'
+    patch:
+      summary: Update organization
+      operationId: updateOrganization
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrgRequest'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgResponse'
+    delete:
+      summary: Archive organization (soft-delete)
+      operationId: archiveOrganization
+      responses:
+        "204":
+          description: Archived
+
+  /organizations/{orgId}/members:
+    parameters:
+      - $ref: '#/components/parameters/TenantIdHeader'
+      - name: orgId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: List organization members
+      operationId: listMembers
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MemberResponse'
+    post:
+      summary: Add member to organization
+      operationId: addMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddMemberRequest'
+      responses:
+        "204":
+          description: Member added
+
+  /organizations/{orgId}/members/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/TenantIdHeader'
+      - name: orgId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      summary: Remove member from organization
+      operationId: removeMember
+      responses:
+        "204":
+          description: Member removed
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    TenantIdHeader:
+      name: X-Tenant-ID
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    CreateOrgRequest:
+      type: object
+      required: [name, type]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [COMPANY, DIVISION, DEPARTMENT, TEAM]
+        parentOrgId:
+          type: string
+          format: uuid
+        metadata:
+          type: object
+          additionalProperties: true
+
+    UpdateOrgRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    OrgResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+        parentOrgId:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    AddMemberRequest:
+      type: object
+      required: [userId, roleInOrg]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        roleInOrg:
+          type: string
+          enum: [OWNER, ADMIN, MEMBER]
+
+    MemberResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        roleInOrg:
+          type: string
+        joinedAt:
+          type: string
+          format: date-time

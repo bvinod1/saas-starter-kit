@@ -1,0 +1,98 @@
+asyncapi: "2.6.0"
+info:
+  title: RBAC Events
+  version: "1.0.0"
+  description: >
+    Role assignment and permission change events published for cache
+    invalidation and audit propagation.
+
+servers:
+  rabbitmq:
+    url: amqp://localhost:5672
+    protocol: amqp
+
+channels:
+  "rbac.role.assigned":
+    description: A role was assigned to a user
+    publish:
+      message:
+        $ref: '#/components/messages/RoleAssignedEvent'
+
+  "rbac.role.revoked":
+    description: A role was revoked from a user
+    publish:
+      message:
+        $ref: '#/components/messages/RoleRevokedEvent'
+
+  "rbac.permission.changed":
+    description: Permissions on a role were modified; triggers cache invalidation
+    publish:
+      message:
+        $ref: '#/components/messages/PermissionChangedEvent'
+
+components:
+  messages:
+    RoleAssignedEvent:
+      payload:
+        type: object
+        required: [userId, tenantId, roleId, grantedBy]
+        properties:
+          userId:
+            type: string
+            format: uuid
+          tenantId:
+            type: string
+            format: uuid
+          roleId:
+            type: string
+          grantedBy:
+            type: string
+            format: uuid
+          grantedAt:
+            type: string
+            format: date-time
+
+    RoleRevokedEvent:
+      payload:
+        type: object
+        required: [userId, tenantId, roleId, revokedBy]
+        properties:
+          userId:
+            type: string
+            format: uuid
+          tenantId:
+            type: string
+            format: uuid
+          roleId:
+            type: string
+          revokedBy:
+            type: string
+            format: uuid
+          revokedAt:
+            type: string
+            format: date-time
+
+    PermissionChangedEvent:
+      payload:
+        type: object
+        required: [roleId, tenantId, changedBy]
+        properties:
+          roleId:
+            type: string
+          tenantId:
+            type: string
+            format: uuid
+          changedBy:
+            type: string
+            format: uuid
+          changedAt:
+            type: string
+            format: date-time
+          added:
+            type: array
+            items:
+              type: string
+          removed:
+            type: array
+            items:
+              type: string

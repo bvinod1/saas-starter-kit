@@ -1,0 +1,119 @@
+asyncapi: "2.6.0"
+info:
+  title: Security & Compliance Events
+  version: "1.0.0"
+  description: >
+    Events published and consumed for GDPR erasure sagas and security
+    audit event propagation.
+
+servers:
+  rabbitmq:
+    url: amqp://localhost:5672
+    protocol: amqp
+
+channels:
+  "user.data.erasure.requested":
+    description: GDPR Right-to-Erasure saga initiator
+    publish:
+      message:
+        $ref: '#/components/messages/UserDataErasureRequestedEvent'
+
+  "{service}.user.data.erasure.completed":
+    description: Per-service confirmation that erasure is done
+    subscribe:
+      message:
+        $ref: '#/components/messages/ServiceErasureCompletedEvent'
+
+  "security.event.detected":
+    description: Security incident published for SIEM/alerting
+    publish:
+      message:
+        $ref: '#/components/messages/SecurityEventDetectedEvent'
+
+  "user.consent.updated":
+    description: Consent preference changed by user
+    publish:
+      message:
+        $ref: '#/components/messages/ConsentUpdatedEvent'
+
+components:
+  messages:
+    UserDataErasureRequestedEvent:
+      payload:
+        type: object
+        required: [erasureRequestId, userId, tenantId, requestedAt]
+        properties:
+          erasureRequestId:
+            type: string
+            format: uuid
+          userId:
+            type: string
+            format: uuid
+          tenantId:
+            type: string
+            format: uuid
+          requestedAt:
+            type: string
+            format: date-time
+
+    ServiceErasureCompletedEvent:
+      payload:
+        type: object
+        required: [erasureRequestId, serviceName, completedAt]
+        properties:
+          erasureRequestId:
+            type: string
+            format: uuid
+          serviceName:
+            type: string
+          completedAt:
+            type: string
+            format: date-time
+          status:
+            type: string
+            enum: [SUCCESS, PARTIAL, FAILED]
+
+    SecurityEventDetectedEvent:
+      payload:
+        type: object
+        required: [eventType, severity, tenantId, occurredAt]
+        properties:
+          eventType:
+            type: string
+            enum: [FAILED_LOGIN, BRUTE_FORCE, PRIVILEGE_ESCALATION, ANOMALY]
+          severity:
+            type: string
+            enum: [LOW, MEDIUM, HIGH, CRITICAL]
+          tenantId:
+            type: string
+            format: uuid
+          userId:
+            type: string
+            format: uuid
+            nullable: true
+          sourceIp:
+            type: string
+          occurredAt:
+            type: string
+            format: date-time
+
+    ConsentUpdatedEvent:
+      payload:
+        type: object
+        required: [userId, tenantId, consentType, consented]
+        properties:
+          userId:
+            type: string
+            format: uuid
+          tenantId:
+            type: string
+            format: uuid
+          consentType:
+            type: string
+          consented:
+            type: boolean
+          version:
+            type: string
+          updatedAt:
+            type: string
+            format: date-time

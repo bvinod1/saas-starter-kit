@@ -1,0 +1,122 @@
+asyncapi: "2.6.0"
+info:
+  title: Notification Service Events
+  version: "1.0.0"
+  description: >
+    Notification service consumes domain events from RabbitMQ and emits
+    notification delivery status events.
+
+servers:
+  rabbitmq:
+    url: amqp://localhost:5672
+    protocol: amqp
+    description: RabbitMQ broker
+
+channels:
+  "{tenantId}.user.registered.email":
+    description: Trigger welcome email on user registration
+    subscribe:
+      message:
+        $ref: '#/components/messages/UserRegisteredEvent'
+
+  "{tenantId}.user.password_reset.email":
+    description: Trigger password reset email
+    subscribe:
+      message:
+        $ref: '#/components/messages/PasswordResetEvent'
+
+  "{tenantId}.subscription.activated.email":
+    description: Trigger subscription confirmation email
+    subscribe:
+      message:
+        $ref: '#/components/messages/SubscriptionActivatedEvent'
+
+  "{tenantId}.notification.delivered":
+    description: Notification delivery status published by notification-service
+    publish:
+      message:
+        $ref: '#/components/messages/NotificationDeliveredEvent'
+
+  notifications.dlq:
+    description: Dead-letter queue for failed notifications
+    publish:
+      message:
+        $ref: '#/components/messages/NotificationFailedEvent'
+
+components:
+  messages:
+    UserRegisteredEvent:
+      payload:
+        type: object
+        required: [userId, email, firstName, tenantId]
+        properties:
+          userId:
+            type: string
+            format: uuid
+          email:
+            type: string
+          firstName:
+            type: string
+          tenantId:
+            type: string
+            format: uuid
+
+    PasswordResetEvent:
+      payload:
+        type: object
+        required: [userId, email, resetToken, tenantId]
+        properties:
+          userId:
+            type: string
+            format: uuid
+          email:
+            type: string
+          resetToken:
+            type: string
+          expiresAt:
+            type: string
+            format: date-time
+          tenantId:
+            type: string
+            format: uuid
+
+    SubscriptionActivatedEvent:
+      payload:
+        type: object
+        required: [tenantId, planId, billingCycle]
+        properties:
+          tenantId:
+            type: string
+            format: uuid
+          planId:
+            type: string
+          billingCycle:
+            type: string
+
+    NotificationDeliveredEvent:
+      payload:
+        type: object
+        properties:
+          notificationId:
+            type: string
+            format: uuid
+          channel:
+            type: string
+          status:
+            type: string
+            enum: [DELIVERED, FAILED]
+          sentAt:
+            type: string
+            format: date-time
+
+    NotificationFailedEvent:
+      payload:
+        type: object
+        properties:
+          notificationId:
+            type: string
+            format: uuid
+          reason:
+            type: string
+          retryCount:
+            type: integer
